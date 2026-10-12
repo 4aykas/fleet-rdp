@@ -133,3 +133,14 @@ func TestSha256(t *testing.T) {
 		t.Fatal("Sha256 is not SHA-256")
 	}
 }
+
+func TestTLSConfigAcceptsOldServers(t *testing.T) {
+	c := tlsConfig()
+	if c.MinVersion != tls.VersionTLS10 {
+		t.Errorf("MinVersion = %#x", c.MinVersion)
+	}
+	want := len(tls.CipherSuites()) + len(tls.InsecureCipherSuites())
+	if len(c.CipherSuites) != want {
+		t.Errorf("%d cipher suites, want %d", len(c.CipherSuites), want)
+	}
+}

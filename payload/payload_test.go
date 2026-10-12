@@ -8,6 +8,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -173,5 +174,72 @@ func TestSharedVector(t *testing.T) {
 				t.Fatalf("Read gave %+v, want %+v", back, p)
 			}
 		})
+	}
+}
+
+func TestValidateHost(t *testing.T) {
+	valid := []string{"10.0.0.5", "::1", "2001:db8::1", "[2001:db8::1]", "[::1]", "rdp.example.com", "WIN-UF5UMK2KNVD", "a", "a-b.c1"}
+	invalid := []string{"10.0.0.5:2157", "host name", " 10.0.0.5", "a\b", "a/b", "[10.0.0.5]", "-bad.example", "bad-.example", "a..b", "", "   ", "[::1", "::1]", "host:3389", strings.Repeat("a", 254)}
+	for _, h := range valid {
+		p := good()
+		p.Host = h
+		if err := p.Validate(); err != nil {
+			t.Errorf("host %q: %v", h, err)
+		}
+	}
+	for _, h := range invalid {
+		p := good()
+		p.Host = h
+		err := p.Validate()
+		if !errors.Is(err, ErrInvalid) {
+			t.Errorf("host %q: got %v, want ErrInvalid", h, err)
+			continue
+		}
+		if strings.Contains(err.Error(), p.Password) {
+			t.Errorf("host %q: error holds the password", h)
+		}
+	}
+	p := good()
+	p.Host = "10.0.0.5:2157"
+	if err := p.Validate(); err == nil || !strings.Contains(err.Error(), "port field") {
+		t.Errorf("host with port: error %v should point to the port field", err)
+	}
+}
+
+func TestValidatePassword(t *testing.T) {
+	p := good()
+	p.Password = ""
+	if err := p.Validate(); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "password is empty") {
+		t.Errorf("empty: got %v", err)
+	}
+	p.Password = strings.Repeat("a", 1280)
+	if err := p.Validate(); err != nil {
+		t.Errorf("1280 units: %v", err)
+	}
+	p.Password = strings.Repeat("a", 1281)
+	err := p.Validate()
+	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "1280") {
+		t.Errorf("1281 units: got %v", err)
+	}
+	// An astral rune is two UTF-16 code units.
+	p.Password = strings.Repeat("a", 1279) + "\U0001F600"
+	if err := p.Validate(); !errors.Is(err, ErrInvalid) {
+		t.Errorf("surrogate pair over the limit: got %v", err)
+	}
+}
+
+func TestAppendPortZeroWritesDefault(t *testing.T) {
+	p := good()
+	p.Port = 0
+	exe, err := Append([]byte("MZ"), p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(exe, []byte(`"port":3389`)) || bytes.Contains(exe, []byte(`"port":0`)) {
+		t.Errorf("JSON does not hold port 3389: %s", exe)
+	}
+	got, err := Read(exe)
+	if err != nil || got.Port != DefaultPort {
+		t.Errorf("Read: %v, port %d", err, got.Port)
 	}
 }

@@ -8,6 +8,14 @@ import (
 	"github.com/4aykas/fleet-rdp/payload"
 )
 
+const damagedMessage = "This launcher file is damaged. Ask for a new one."
+
+// damagedError shows the friendly sentence and still unwraps to the cause.
+type damagedError struct{ cause error }
+
+func (e damagedError) Error() string { return damagedMessage }
+func (e damagedError) Unwrap() error { return e.cause }
+
 const templateMessage = "This is a template; build a launcher with fleet-rdp build"
 
 // deps is everything run touches outside memory, so the flow is tested on any
@@ -32,6 +40,9 @@ func run(d deps) (string, error) {
 	p, err := payload.Read(exe)
 	if errors.Is(err, payload.ErrNoPayload) {
 		return "", errors.New(templateMessage)
+	}
+	if errors.Is(err, payload.ErrCorrupt) || errors.Is(err, payload.ErrInvalid) {
+		return "", damagedError{err}
 	}
 	if err != nil {
 		return "", err

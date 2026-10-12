@@ -72,7 +72,7 @@ func Fetch(ctx context.Context, host string, port int) ([]byte, error) {
 	// Verification is off on purpose: we are not authenticating the chain, we
 	// are recording the key the server shows now and pinning it (trust on
 	// first use). Anything stronger is the payload's certSha256.
-	tc := tls.Client(conn, &tls.Config{InsecureSkipVerify: true}) // #nosec G402
+	tc := tls.Client(conn, tlsConfig())
 	if err := tc.HandshakeContext(ctx); err != nil {
 		return nil, fmt.Errorf("cert: TLS handshake: %w", err)
 	}
@@ -81,6 +81,19 @@ func Fetch(ctx context.Context, host string, port int) ([]byte, error) {
 		return nil, errors.New("cert: server presented no certificate")
 	}
 	return certs[0].Raw, nil
+}
+
+// tlsConfig accepts every protocol version and cipher suite Go can speak:
+// nothing is authenticated here (TOFU), and old RDP servers must not fail.
+func tlsConfig() *tls.Config {
+	var suites []uint16
+	for _, s := range tls.CipherSuites() {
+		suites = append(suites, s.ID)
+	}
+	for _, s := range tls.InsecureCipherSuites() {
+		suites = append(suites, s.ID)
+	}
+	return &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS10, CipherSuites: suites} // #nosec G402
 }
 
 // Sha256 is the CertHash mstsc stores: SHA-256 of the DER certificate.

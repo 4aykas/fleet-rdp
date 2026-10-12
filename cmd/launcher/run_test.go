@@ -169,3 +169,32 @@ func TestRunCannotReadItself(t *testing.T) {
 		t.Fatal("expected an error")
 	}
 }
+
+func TestRunDamagedPayloadIsFriendly(t *testing.T) {
+	const want = "This launcher file is damaged. Ask for a new one."
+	corrupt := append([]byte("MZ"), 0xff, 0xff, 0xff, 0x7f)
+	corrupt = append(corrupt, payload.Magic...)
+	_, err := run(newDeps(corrupt, &rec{}))
+	if err == nil || err.Error() != want || !errors.Is(err, payload.ErrCorrupt) {
+		t.Errorf("corrupt: got %v", err)
+	}
+	js := `{"v":1,"host":"a b","user":"u","password":"p"}`
+	bad := append([]byte("MZ"), js...)
+	bad = append(bad, byte(len(js)), 0, 0, 0)
+	bad = append(bad, payload.Magic...)
+	_, err = run(newDeps(bad, &rec{}))
+	if err == nil || err.Error() != want || !errors.Is(err, payload.ErrInvalid) {
+		t.Errorf("invalid: got %v", err)
+	}
+}
+
+func TestRunNewerPayloadText(t *testing.T) {
+	js := `{"v":2,"host":"h","user":"u","password":"p"}`
+	exe := append([]byte("MZ"), js...)
+	exe = append(exe, byte(len(js)), 0, 0, 0)
+	exe = append(exe, payload.Magic...)
+	_, err := run(newDeps(exe, &rec{}))
+	if err == nil || err.Error() != "This launcher is newer than its template." {
+		t.Errorf("got %v", err)
+	}
+}
