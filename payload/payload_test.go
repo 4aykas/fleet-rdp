@@ -179,7 +179,7 @@ func TestSharedVector(t *testing.T) {
 
 func TestValidateHost(t *testing.T) {
 	valid := []string{"10.0.0.5", "::1", "2001:db8::1", "[2001:db8::1]", "[::1]", "rdp.example.com", "WIN-UF5UMK2KNVD", "a", "a-b.c1"}
-	invalid := []string{"10.0.0.5:2157", "host name", " 10.0.0.5", "a\b", "a/b", "[10.0.0.5]", "-bad.example", "bad-.example", "a..b", "", "   ", "[::1", "::1]", "host:3389", strings.Repeat("a", 254)}
+	invalid := []string{"10.0.0.5:2157", "host name", " 10.0.0.5", `a\b`, "a\x08b", "a/b", "[10.0.0.5]", "-bad.example", "bad-.example", "a..b", "", "   ", "[::1", "::1]", "host:3389", strings.Repeat("a", 254)}
 	for _, h := range valid {
 		p := good()
 		p.Host = h
