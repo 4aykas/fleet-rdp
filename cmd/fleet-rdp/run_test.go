@@ -2,9 +2,14 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -310,5 +315,59 @@ func TestInspectHelpPrintsUsage(t *testing.T) {
 		if code != 0 || !strings.Contains(out, "usage") || errOut != "" {
 			t.Errorf("%s: exit %d, stdout %q, stderr %q", flag, code, out, errOut)
 		}
+	}
+}
+
+func stubFetch(t *testing.T, f func(ctx context.Context, host string, port int) ([]byte, error)) {
+	t.Helper()
+	old := fetchCert
+	fetchCert = f
+	t.Cleanup(func() { fetchCert = old })
+}
+
+func TestProbePrintsHashAndElapsed(t *testing.T) {
+	der := []byte("fake der")
+	var gotHost string
+	var gotPort int
+	stubFetch(t, func(_ context.Context, h string, p int) ([]byte, error) { gotHost, gotPort = h, p; return der, nil })
+	code, stdout, stderr := call([]string{"probe", "10.0.0.5", "2157"}, "", noEnv)
+	if code != 0 || stderr != "" {
+		t.Fatalf("code %d stderr %q", code, stderr)
+	}
+	sum := sha256.Sum256(der)
+	re := regexp.MustCompile("^" + hex.EncodeToString(sum[:]) + `  [0-9.]+(µs|ms|s)\n$`)
+	if !re.MatchString(stdout) {
+		t.Fatalf("unexpected output %q", stdout)
+	}
+	if gotHost != "10.0.0.5" || gotPort != 2157 {
+		t.Fatalf("fetched %s:%d", gotHost, gotPort)
+	}
+}
+
+func TestProbeFetchError(t *testing.T) {
+	stubFetch(t, func(context.Context, string, int) ([]byte, error) { return nil, errors.New("boom") })
+	code, stdout, stderr := call([]string{"probe", "h", "1"}, "", noEnv)
+	if code != 1 || stdout != "" || stderr != "fleet-rdp probe: boom\n" {
+		t.Fatalf("code %d stdout %q stderr %q", code, stdout, stderr)
+	}
+}
+
+func TestProbeBadArgs(t *testing.T) {
+	stubFetch(t, func(context.Context, string, int) ([]byte, error) { t.Fatal("fetched"); return nil, nil })
+	for _, args := range [][]string{
+		{"probe"}, {"probe", "h"}, {"probe", "h", "1", "2"}, {"probe", "", "80"},
+		{"probe", "h", "x"}, {"probe", "h", "0"}, {"probe", "h", "65536"}, {"probe", "h", "-1"},
+	} {
+		code, stdout, stderr := call(args, "", noEnv)
+		if code != 2 || stdout != "" || !strings.Contains(stderr, "usage:") {
+			t.Errorf("%v: code %d stdout %q stderr %q", args, code, stdout, stderr)
+		}
+	}
+}
+
+func TestProbeHelp(t *testing.T) {
+	code, stdout, _ := call([]string{"probe", "-h"}, "", noEnv)
+	if code != 0 || !strings.Contains(stdout, "fleet-rdp probe HOST PORT") {
+		t.Fatalf("code %d stdout %q", code, stdout)
 	}
 }

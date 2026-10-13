@@ -39,6 +39,10 @@ windows/amd64. On another OS, `go build ./cmd/fleet-rdp` builds the CLI.
 - After the server's RDP certificate renews, `mstsc` shows its certificate
   dialog once (the stored pin is kept; "zero clicks" holds until the renewal).
 
+- `fleet-rdp probe HOST PORT` connects the way an RDP client does and prints
+  `<sha256 of the server certificate>  <elapsed>`. Use it to see what
+  certificate a server shows, or to get the value for `--cert-sha256`.
+
 The launcher accepts `--single` and `--multi` to override the monitor
 detection (`/multimon` is used when Windows reports more than one monitor).
 

@@ -2,6 +2,9 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -10,19 +13,26 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/term"
 
+	"github.com/4aykas/fleet-rdp/cert"
 	"github.com/4aykas/fleet-rdp/payload"
 )
 
-// executable is replaced in tests.
-var executable = os.Executable
+// executable and fetchCert are replaced in tests.
+var (
+	executable = os.Executable
+	fetchCert  = cert.Fetch
+)
 
 const usage = `usage:
   fleet-rdp build --host H [--port P] --user U [--name N] [--cert-sha256 X] [--template PATH] -o OUT.exe
   fleet-rdp inspect FILE.exe
+  fleet-rdp probe HOST PORT
 
 The password is read from FLEET_RDP_PASSWORD or, failing that, from stdin
 (a hidden prompt on a terminal). It is never an argument.
@@ -38,6 +48,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, env func(stri
 		return runBuild(args[1:], stdin, stdout, stderr, env)
 	case "inspect":
 		return runInspect(args[1:], stdout, stderr)
+	case "probe":
+		return runProbe(args[1:], stdout, stderr)
 	case "help", "-h", "--help":
 		fmt.Fprint(stdout, usage)
 		return 0
@@ -162,6 +174,34 @@ func writeAtomic(path string, data []byte) (err error) {
 		return err
 	}
 	return os.Rename(tmp.Name(), path)
+}
+
+// runProbe prints the SHA-256 of the certificate a server shows on its RDP
+// port, and how long the exchange took.
+func runProbe(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && (args[0] == "-h" || args[0] == "--help" || args[0] == "-help") {
+		fmt.Fprint(stdout, usage)
+		return 0
+	}
+	if len(args) != 2 || args[0] == "" {
+		fmt.Fprint(stderr, usage)
+		return 2
+	}
+	port, err := strconv.Atoi(args[1])
+	if err != nil || port < 1 || port > 65535 {
+		fmt.Fprint(stderr, usage)
+		return 2
+	}
+	start := time.Now()
+	der, err := fetchCert(context.Background(), args[0], port)
+	elapsed := time.Since(start)
+	if err != nil {
+		fmt.Fprintln(stderr, "fleet-rdp probe:", err)
+		return 1
+	}
+	sum := sha256.Sum256(der)
+	fmt.Fprintf(stdout, "%s  %s\n", hex.EncodeToString(sum[:]), elapsed.Round(time.Millisecond))
+	return 0
 }
 
 func runInspect(args []string, stdout, stderr io.Writer) int {
