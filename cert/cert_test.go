@@ -13,6 +13,7 @@ import (
 	"io"
 	"math/big"
 	"net"
+	"strings"
 	"testing"
 	"time"
 )
@@ -67,11 +68,13 @@ func serve(t *testing.T, reply []byte, cert *tls.Certificate) (port int, got cha
 			return
 		}
 		conn.Write(reply)
-		if cert != nil {
-			tc := tls.Server(conn, &tls.Config{Certificates: []tls.Certificate{*cert}})
-			if tc.Handshake() == nil {
-				io.Copy(io.Discard, tc)
-			}
+		if cert == nil {
+			<-done // keep the connection open: a client must not rely on EOF
+			return
+		}
+		tc := tls.Server(conn, &tls.Config{Certificates: []tls.Certificate{*cert}})
+		if tc.Handshake() == nil {
+			io.Copy(io.Discard, tc)
 		}
 	}()
 	return ln.Addr().(*net.TCPAddr).Port, got
@@ -119,8 +122,9 @@ func TestFetchTimesOutOnASilentServer(t *testing.T) {
 	defer cancel()
 
 	start := time.Now()
-	if _, err := Fetch(ctx, "127.0.0.1", port); err == nil {
-		t.Fatal("expected a timeout error")
+	_, err := Fetch(ctx, "127.0.0.1", port)
+	if err == nil || !strings.Contains(err.Error(), "read connection confirm") {
+		t.Fatalf("got %v, want a read connection confirm error", err)
 	}
 	if time.Since(start) > 2*time.Second {
 		t.Fatalf("took %v; the context deadline was ignored", time.Since(start))
@@ -142,5 +146,71 @@ func TestTLSConfigAcceptsOldServers(t *testing.T) {
 	want := len(tls.CipherSuites()) + len(tls.InsecureCipherSuites())
 	if len(c.CipherSuites) != want {
 		t.Errorf("%d cipher suites, want %d", len(c.CipherSuites), want)
+	}
+}
+
+func TestFetchShortConfirmReturnsAtOnce(t *testing.T) {
+	// 11 bytes: Connection Confirm without RDP_NEG_RSP (standard RDP security).
+	short := []byte{0x03, 0x00, 0x00, 0x0B, 0x06, 0xD0, 0x00, 0x00, 0x12, 0x34, 0x00}
+	port, _ := serve(t, short, nil)
+
+	start := time.Now()
+	_, err := Fetch(context.Background(), "127.0.0.1", port)
+	if err == nil || !strings.Contains(err.Error(), "no TLS") {
+		t.Fatalf("got %v, want the no-TLS error", err)
+	}
+	if time.Since(start) > time.Second {
+		t.Fatalf("took %v; it waited for bytes that never come", time.Since(start))
+	}
+}
+
+func TestFetchRejectsMalformedReplies(t *testing.T) {
+	with := func(mutate func(b []byte)) []byte {
+		b := append([]byte(nil), confirm...)
+		mutate(b)
+		return b
+	}
+	cases := []struct {
+		name  string
+		reply []byte
+		want  string
+	}{
+		{"TPKT length too small", with(func(b []byte) { b[3] = 0x05 }), "length"},
+		{"TPKT length too large", with(func(b []byte) { b[3] = 0x40 }), "length"},
+		{"TPKT length between the two valid ones", with(func(b []byte) { b[3] = 0x0F }), "length"},
+		{"not TPKT", []byte("HTTP/1.1 400 Bad Request\r\n\r\n"), "not an RDP server"},
+		{"not a Connection Confirm", with(func(b []byte) { b[5] = 0xE0 }), "not an RDP server"},
+		{"unknown negotiation type", with(func(b []byte) { b[11] = 0x7F }), "unexpected negotiation type 0x7f"},
+		{"RDP_NEG_FAILURE", with(func(b []byte) { b[11] = 0x03 }), "RDP_NEG_FAILURE"},
+		{"TLS not selected", with(func(b []byte) { b[15] = 0 }), "did not select TLS"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			port, _ := serve(t, c.reply, nil)
+			start := time.Now()
+			_, err := Fetch(context.Background(), "127.0.0.1", port)
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("got %v, want an error containing %q", err, c.want)
+			}
+			if time.Since(start) > time.Second {
+				t.Fatalf("took %v", time.Since(start))
+			}
+		})
+	}
+}
+
+func TestFetchCancelledDuringTheHandshake(t *testing.T) {
+	// The server confirms TLS and then never speaks it.
+	port, _ := serve(t, confirm, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(150*time.Millisecond, cancel)
+
+	start := time.Now()
+	_, err := Fetch(ctx, "127.0.0.1", port)
+	if err == nil || !strings.Contains(err.Error(), "TLS handshake") {
+		t.Fatalf("got %v, want a TLS handshake error", err)
+	}
+	if time.Since(start) > 2*time.Second {
+		t.Fatalf("took %v; the cancelled context was ignored", time.Since(start))
 	}
 }

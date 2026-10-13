@@ -26,6 +26,8 @@ var x224Request = []byte{
 const (
 	timeout     = 5 * time.Second
 	responseLen = 19
+	// shortConfirmLen is a Connection Confirm without RDP_NEG_RSP.
+	shortConfirmLen = 11
 )
 
 // Fetch dials host:port, negotiates TLS the way an RDP client does and returns
@@ -51,12 +53,27 @@ func Fetch(ctx context.Context, host string, port int) ([]byte, error) {
 	if _, err := conn.Write(x224Request); err != nil {
 		return nil, fmt.Errorf("cert: send connection request: %w", err)
 	}
+	// Read the TPKT header first: a server without RDP_NEG_RSP answers with
+	// 11 bytes, and waiting for 19 would block until the deadline.
 	resp := make([]byte, responseLen)
-	if _, err := io.ReadFull(conn, resp); err != nil {
+	if _, err := io.ReadFull(conn, resp[:4]); err != nil {
 		return nil, fmt.Errorf("cert: read connection confirm: %w", err)
 	}
-	if resp[0] != 0x03 || resp[5] != 0xD0 {
+	if resp[0] != 0x03 {
 		return nil, errors.New("cert: not an RDP server")
+	}
+	n := int(binary.BigEndian.Uint16(resp[2:4]))
+	if n != shortConfirmLen && n != responseLen {
+		return nil, fmt.Errorf("cert: unexpected connection confirm length %d", n)
+	}
+	if _, err := io.ReadFull(conn, resp[4:n]); err != nil {
+		return nil, fmt.Errorf("cert: read connection confirm: %w", err)
+	}
+	if resp[5] != 0xD0 {
+		return nil, errors.New("cert: not an RDP server")
+	}
+	if n == shortConfirmLen {
+		return nil, errors.New("cert: server offers no TLS (standard RDP security only)")
 	}
 	switch resp[11] {
 	case 0x02: // RDP_NEG_RSP
@@ -79,6 +96,9 @@ func Fetch(ctx context.Context, host string, port int) ([]byte, error) {
 	certs := tc.ConnectionState().PeerCertificates
 	if len(certs) == 0 {
 		return nil, errors.New("cert: server presented no certificate")
+	}
+	if len(certs[0].Raw) == 0 {
+		return nil, errors.New("cert: server presented an empty certificate")
 	}
 	return certs[0].Raw, nil
 }
