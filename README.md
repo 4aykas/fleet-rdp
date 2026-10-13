@@ -62,8 +62,10 @@ tagging. `-SkipPushCheck` is for testing the script only.
   `<sha256 of the server certificate>  <elapsed>`. Use it to see what
   certificate a server shows, or to get the value for `--cert-sha256`.
 
-The launcher accepts `--single` and `--multi` to override the monitor
-detection (`/multimon` is used when Windows reports more than one monitor).
+The payload's `monitors` mode (`auto`, `one` or `all`, set by the dashboard or
+by `fleet-rdp build --monitors`) decides first: `auto` uses `/multimon` when
+Windows reports more than one monitor. The launcher accepts `--single` and
+`--multi` to override that mode; if both are given, the last flag wins.
 
 ## Payload format
 
