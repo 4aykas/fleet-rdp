@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -206,5 +208,107 @@ func TestUsage(t *testing.T) {
 	}
 	if code, out, _ := call([]string{"help"}, "", noEnv); code != 0 || !strings.Contains(out, "usage") {
 		t.Errorf("help: exit %d, output %q", code, out)
+	}
+}
+
+func TestBuildRejectsStrayArguments(t *testing.T) {
+	tpl := writeTemplate(t)
+	out := filepath.Join(t.TempDir(), "x.exe")
+	code, _, stderr := call([]string{"build", "--host", "h", "--user", "u", "--template", tpl, "-o", out, "stray"}, "", envWith("FLEET_RDP_PASSWORD", secret))
+	if code != 2 {
+		t.Fatalf("exit %d, want 2", code)
+	}
+	if !strings.Contains(stderr, `"stray"`) || !strings.Contains(stderr, "usage") {
+		t.Fatalf("want the argument and the usage, got %q", stderr)
+	}
+	if _, err := os.Stat(out); err == nil {
+		t.Fatal("an output file was written")
+	}
+}
+
+// failingReader fails the test if anything asks it for the password.
+type failingReader struct{ t *testing.T }
+
+func (r failingReader) Read([]byte) (int, error) {
+	r.t.Error("the password was requested")
+	return 0, io.EOF
+}
+
+func TestBuildValidatesBeforeAskingForThePassword(t *testing.T) {
+	tpl := writeTemplate(t)
+	dir := t.TempDir()
+	withPayload := filepath.Join(dir, "has-payload.exe")
+	built, _ := payload.Append([]byte("MZ"), payload.Payload{V: 1, Host: "h", Port: 3389, User: "u", Password: "p"})
+	os.WriteFile(withPayload, built, 0o644)
+	out := filepath.Join(dir, "a.exe")
+
+	cases := map[string][]string{
+		"bad port":         {"build", "--host", "h", "--port", "70000", "--user", "u", "--template", tpl, "-o", out},
+		"bad host":         {"build", "--host", "h:3389", "--user", "u", "--template", tpl, "-o", out},
+		"bad cert":         {"build", "--host", "h", "--user", "u", "--cert-sha256", "nope", "--template", tpl, "-o", out},
+		"missing template": {"build", "--host", "h", "--user", "u", "--template", filepath.Join(dir, "none.exe"), "-o", out},
+		"has a payload":    {"build", "--host", "h", "--user", "u", "--template", withPayload, "-o", out},
+		"no output dir":    {"build", "--host", "h", "--user", "u", "--template", tpl, "-o", filepath.Join(dir, "missing", "a.exe")},
+	}
+	for name, args := range cases {
+		var o, e bytes.Buffer
+		if code := run(args, failingReader{t}, &o, &e, noEnv); code != 1 {
+			t.Errorf("%s: exit %d, want 1 (%s)", name, code, e.String())
+		}
+	}
+}
+
+func TestBuildOutputIsReplacedAtomically(t *testing.T) {
+	tpl := writeTemplate(t)
+	dir := t.TempDir()
+	env := envWith("FLEET_RDP_PASSWORD", secret)
+
+	t.Run("an existing file is replaced, no temp file stays", func(t *testing.T) {
+		out := filepath.Join(dir, "old.exe")
+		os.WriteFile(out, []byte("old contents"), 0o644)
+		if code, _, stderr := call([]string{"build", "--host", "h", "--user", "u", "--template", tpl, "-o", out}, "", env); code != 0 {
+			t.Fatal(stderr)
+		}
+		exe, _ := os.ReadFile(out)
+		if _, err := payload.Read(exe); err != nil {
+			t.Fatalf("output is not a launcher: %v", err)
+		}
+		if runtime.GOOS != "windows" {
+			if fi, _ := os.Stat(out); fi.Mode().Perm() != 0o600 {
+				t.Errorf("mode %v, want 0600", fi.Mode().Perm())
+			}
+		}
+		left, _ := filepath.Glob(filepath.Join(dir, ".fleet-rdp-*"))
+		if len(left) != 0 {
+			t.Errorf("temp files left behind: %v", left)
+		}
+	})
+
+	t.Run("a failed rename leaves the target alone and no temp file", func(t *testing.T) {
+		// A directory cannot be replaced by a file: the rename fails.
+		out := filepath.Join(dir, "adir")
+		if err := os.Mkdir(out, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		code, _, stderr := call([]string{"build", "--host", "h", "--user", "u", "--template", tpl, "-o", out}, "", env)
+		if code != 1 || !strings.Contains(stderr, "cannot write the output") {
+			t.Fatalf("exit %d: %s", code, stderr)
+		}
+		if fi, err := os.Stat(out); err != nil || !fi.IsDir() {
+			t.Error("the target was damaged")
+		}
+		left, _ := filepath.Glob(filepath.Join(dir, ".fleet-rdp-*"))
+		if len(left) != 0 {
+			t.Errorf("temp files left behind: %v", left)
+		}
+	})
+}
+
+func TestInspectHelpPrintsUsage(t *testing.T) {
+	for _, flag := range []string{"-h", "--help"} {
+		code, out, errOut := call([]string{"inspect", flag}, "", noEnv)
+		if code != 0 || !strings.Contains(out, "usage") || errOut != "" {
+			t.Errorf("%s: exit %d, stdout %q, stderr %q", flag, code, out, errOut)
+		}
 	}
 }

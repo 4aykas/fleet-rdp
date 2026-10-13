@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"golang.org/x/term"
@@ -62,6 +63,10 @@ func runBuild(args []string, stdin io.Reader, stdout, stderr io.Writer, env func
 		}
 		return 2
 	}
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "fleet-rdp build: unexpected argument %q\n\n%s", fs.Arg(0), usage)
+		return 2
+	}
 	if *host == "" || *user == "" || *out == "" {
 		fmt.Fprintln(stderr, "fleet-rdp build: --host, --user and -o are required")
 		return 2
@@ -89,6 +94,26 @@ func runBuild(args []string, stdin io.Reader, stdout, stderr io.Writer, env func
 		return 1
 	}
 
+	if fi, err := os.Stat(filepath.Dir(*out)); err != nil || !fi.IsDir() {
+		fmt.Fprintln(stderr, "fleet-rdp build: the output directory does not exist")
+		return 1
+	}
+
+	label := *name
+	if label == "" {
+		label = *host
+	}
+	p := payload.Payload{
+		V: payload.Version, Name: label, Host: *host, Port: *port,
+		User: *user, Password: "x", CertSha256: strings.ToLower(*pin),
+	}
+	// Everything but the password is checked before the prompt, so a typo in
+	// a flag does not cost a typed password. (A placeholder stands in for it.)
+	if _, err := payload.Append(template, p); err != nil {
+		fmt.Fprintln(stderr, "fleet-rdp build:", err)
+		return 1
+	}
+
 	password, err := readPassword(stdin, stderr, env)
 	if err != nil {
 		fmt.Fprintln(stderr, "fleet-rdp build:", err)
@@ -98,21 +123,13 @@ func runBuild(args []string, stdin io.Reader, stdout, stderr io.Writer, env func
 		fmt.Fprintln(stderr, "fleet-rdp build: the password is empty")
 		return 1
 	}
-
-	label := *name
-	if label == "" {
-		label = *host
-	}
-	built, err := payload.Append(template, payload.Payload{
-		V: payload.Version, Name: label, Host: *host, Port: *port,
-		User: *user, Password: password, CertSha256: strings.ToLower(*pin),
-	})
+	p.Password = password
+	built, err := payload.Append(template, p)
 	if err != nil {
 		fmt.Fprintln(stderr, "fleet-rdp build:", err)
 		return 1
 	}
-	// 0600: the file is as secret as the password. (Windows ignores the bits.)
-	if err := os.WriteFile(*out, built, 0o600); err != nil {
+	if err := writeAtomic(*out, built); err != nil {
 		fmt.Fprintln(stderr, "fleet-rdp build: cannot write the output:", err)
 		return 1
 	}
@@ -120,7 +137,38 @@ func runBuild(args []string, stdin io.Reader, stdout, stderr io.Writer, env func
 	return 0
 }
 
+// writeAtomic writes data to a temp file beside path and renames it over path,
+// so a failure never leaves a half-written exe. The temp file is created 0600
+// (the file is as secret as the password; Windows ignores the bits), and the
+// rename gives that mode to the result even when path already existed.
+func writeAtomic(path string, data []byte) (err error) {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".fleet-rdp-*.tmp")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			tmp.Close()
+			os.Remove(tmp.Name())
+		}
+	}()
+	if err = tmp.Chmod(0o600); err != nil && runtime.GOOS != "windows" {
+		return err
+	}
+	if _, err = tmp.Write(data); err != nil {
+		return err
+	}
+	if err = tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
+}
+
 func runInspect(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && (args[0] == "-h" || args[0] == "--help" || args[0] == "-help") {
+		fmt.Fprint(stdout, usage)
+		return 0
+	}
 	if len(args) != 1 {
 		fmt.Fprint(stderr, usage)
 		return 2
