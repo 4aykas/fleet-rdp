@@ -1,0 +1,14 @@
+#!/bin/sh
+# No CI here; this hook is the guardrail. Enable per clone:
+#   git config core.hooksPath .githooks
+log=$(mktemp)
+fail() { tail -n 40 "$log"; echo "pre-commit: $1 FAILED"; exit 1; }
+
+unformatted=$(gofmt -l .)
+[ -z "$unformatted" ] || { echo "$unformatted" >"$log"; fail "gofmt -l ."; }
+go vet ./... >"$log" 2>&1 || fail "go vet"
+go test ./... >"$log" 2>&1 || fail "go test"
+GOOS=linux go build ./... >"$log" 2>&1 || fail "GOOS=linux go build"
+GOOS=windows go build ./... >"$log" 2>&1 || fail "GOOS=windows go build"
+rm -f "$log"
+echo "pre-commit: gofmt, vet, test, linux and windows builds passed."
