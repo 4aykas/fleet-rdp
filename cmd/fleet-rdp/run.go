@@ -67,6 +67,7 @@ func runBuild(args []string, stdin io.Reader, stdout, stderr io.Writer, env func
 	user := fs.String("user", "", `login, optionally DOMAIN\login`)
 	name := fs.String("name", "", "label for dialog titles (default: the host)")
 	pin := fs.String("cert-sha256", "", "pin the server certificate (64 hex characters) instead of trusting it on first use")
+	monitors := fs.String("monitors", payload.MonitorsAuto, "which screens mstsc uses: auto (all when there is more than one), one or all")
 	tmpl := fs.String("template", "", "launcher template (default: fleet-rdp-launcher.exe beside this program)")
 	out := fs.String("o", "", "output file")
 	if err := fs.Parse(args); err != nil {
@@ -118,6 +119,7 @@ func runBuild(args []string, stdin io.Reader, stdout, stderr io.Writer, env func
 	p := payload.Payload{
 		V: payload.Version, Name: label, Host: *host, Port: *port,
 		User: *user, Password: "x", CertSha256: strings.ToLower(*pin),
+		Monitors: *monitors,
 	}
 	// Everything but the password is checked before the prompt, so a typo in
 	// a flag does not cost a typed password. (A placeholder stands in for it.)

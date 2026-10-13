@@ -67,7 +67,7 @@ func TestBuildThenInspect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := payload.Payload{V: 1, Name: "SGCLOUD", Host: "10.0.0.5", Port: 2157, User: `CORP\vlad`, Password: secret}
+	want := payload.Payload{V: 1, Name: "SGCLOUD", Host: "10.0.0.5", Port: 2157, User: `CORP\vlad`, Password: secret, Monitors: payload.MonitorsAuto}
 	if p != want {
 		t.Fatalf("payload = %+v, want %+v", p, want)
 	}
@@ -128,6 +128,39 @@ func TestBuildPinsTheCertificate(t *testing.T) {
 	if p.CertSha256 != strings.ToLower(pin) {
 		t.Fatalf("certSha256 = %q", p.CertSha256)
 	}
+}
+
+func TestBuildMonitors(t *testing.T) {
+	tpl := writeTemplate(t)
+	dir := t.TempDir()
+
+	t.Run("one is stored in the payload", func(t *testing.T) {
+		out := filepath.Join(dir, "one.exe")
+		code, _, stderr := call([]string{"build", "--host", "h", "--user", "u", "--monitors", "one", "--template", tpl, "-o", out}, "", envWith("FLEET_RDP_PASSWORD", secret))
+		if code != 0 {
+			t.Fatal(stderr)
+		}
+		exe, _ := os.ReadFile(out)
+		p, err := payload.Read(exe)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.Monitors != "one" {
+			t.Fatalf("Monitors = %q, want one", p.Monitors)
+		}
+	})
+
+	t.Run("an unknown value fails before the password prompt", func(t *testing.T) {
+		out := filepath.Join(dir, "two.exe")
+		var o, e bytes.Buffer
+		args := []string{"build", "--host", "h", "--user", "u", "--monitors", "two", "--template", tpl, "-o", out}
+		if code := run(args, failingReader{t}, &o, &e, noEnv); code != 1 {
+			t.Fatalf("exit %d, want 1 (%s)", code, e.String())
+		}
+		if _, err := os.Stat(out); err == nil {
+			t.Fatal("an output file was written")
+		}
+	})
 }
 
 func TestBuildFailures(t *testing.T) {

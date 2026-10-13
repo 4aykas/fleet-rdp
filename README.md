@@ -47,6 +47,8 @@ tagging. `-SkipPushCheck` is for testing the script only.
   that already carries a payload is refused.
 - `--cert-sha256 <64 hex>` pins the server certificate. Without it the first
   run trusts the certificate the server shows (trust on first use).
+- `--monitors auto|one|all` chooses the screens `mstsc` uses. `auto` (the
+  default) uses all of them when Windows reports more than one monitor.
 - `fleet-rdp inspect SGCLOUD.exe` prints the payload with the password as `***`.
 - After the server's RDP certificate renews, `mstsc` shows its certificate
   dialog once (the stored pin is kept; "zero clicks" holds until the renewal).

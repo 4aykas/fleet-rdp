@@ -132,7 +132,7 @@ func TestReadDefaultsThePortAndIgnoresUnknownFields(t *testing.T) {
 // also proves that Append produces the JSON the file holds (field order,
 // no HTML escaping).
 func TestSharedVector(t *testing.T) {
-	for _, name := range []string{"payload-v1", "payload-v1-nocert"} {
+	for _, name := range []string{"payload-v1", "payload-v1-nocert", "payload-v1-monitors"} {
 		t.Run(name, func(t *testing.T) {
 			js, err := os.ReadFile(filepath.Join("..", "testdata", name+".json"))
 			if err != nil {
@@ -241,5 +241,37 @@ func TestAppendPortZeroWritesDefault(t *testing.T) {
 	got, err := Read(exe)
 	if err != nil || got.Port != DefaultPort {
 		t.Errorf("Read: %v, port %d", err, got.Port)
+	}
+}
+
+func TestValidateMonitors(t *testing.T) {
+	base := Payload{V: Version, Name: "n", Host: "10.0.0.5", Port: 3389, User: "u", Password: "p"}
+	for _, m := range []string{"", MonitorsAuto, MonitorsOne, MonitorsAll} {
+		p := base
+		p.Monitors = m
+		if err := p.Validate(); err != nil {
+			t.Errorf("monitors %q: %v", m, err)
+		}
+	}
+	for _, m := range []string{"two", "ALL", " one"} {
+		p := base
+		p.Monitors = m
+		if err := p.Validate(); !errors.Is(err, ErrInvalid) {
+			t.Errorf("monitors %q: err = %v, want ErrInvalid", m, err)
+		}
+	}
+}
+
+func TestOldVectorHasNoMonitors(t *testing.T) {
+	js, err := os.ReadFile(filepath.Join("..", "testdata", "payload-v1.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p Payload
+	if err := json.Unmarshal(js, &p); err != nil {
+		t.Fatal(err)
+	}
+	if p.Monitors != "" {
+		t.Fatalf("Monitors = %q, want empty (auto)", p.Monitors)
 	}
 }

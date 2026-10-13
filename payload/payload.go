@@ -19,7 +19,9 @@
 //   - password is not empty and at most 1280 UTF-16 code units (the Credential
 //     Manager limit).
 //   - certSha256 is empty or 64 hex characters.
-//   - Fields are written in struct order, compact, without HTML escaping.
+//   - monitors is empty, "auto", "one" or "all".
+//   - Fields are written in struct order (v, name, host, port, user, password,
+//     certSha256, monitors), compact, without HTML escaping.
 package payload
 
 import (
@@ -84,7 +86,16 @@ type Payload struct {
 	User       string `json:"user"`
 	Password   string `json:"password"`
 	CertSha256 string `json:"certSha256,omitempty"`
+	// Monitors is "auto" (or empty), "one" or "all": which screens mstsc uses.
+	Monitors string `json:"monitors,omitempty"`
 }
+
+// The values of Payload.Monitors. Empty means MonitorsAuto.
+const (
+	MonitorsAuto = "auto"
+	MonitorsOne  = "one"
+	MonitorsAll  = "all"
+)
 
 // Validate checks everything a launcher needs. Port 0 means "not given" and is
 // accepted here; Read turns it into DefaultPort.
@@ -114,6 +125,11 @@ func (p Payload) Validate() error {
 		if sum, err := hex.DecodeString(p.CertSha256); err != nil || len(sum) != 32 {
 			return fmt.Errorf("%w: certSha256 must be 64 hex characters", ErrInvalid)
 		}
+	}
+	switch p.Monitors {
+	case "", MonitorsAuto, MonitorsOne, MonitorsAll:
+	default:
+		return fmt.Errorf("%w: monitors must be auto, one or all", ErrInvalid)
 	}
 	return nil
 }
