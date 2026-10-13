@@ -14,6 +14,18 @@ Produces `dist/fleet-rdp-launcher.exe` (the template; do not run it) and
 `dist/fleet-rdp.exe` (the CLI), and prints their SHA-256. Both are
 windows/amd64. On another OS, `go build ./cmd/fleet-rdp` builds the CLI.
 
+## Releasing
+
+    pwsh ./release.ps1 -Version v0.1.2 -Notes 'what changed' [-ProbeHost H -ProbePort P]
+
+Requires a clean tree with everything pushed to `origin/main`. It builds,
+hashes, optionally probes a live server's certificate, tags and pushes,
+creates the GitHub release with both assets, then downloads the published
+launcher and compares its SHA-256. It ends by printing the FleetView pin
+command (`node scripts/pin-launcher.mjs <version>`) and the template hash.
+`-DryRun` does the checks, build and probe and prints the rest without
+tagging. `-SkipPushCheck` is for testing the script only.
+
 ## Make a launcher
 
     fleet-rdp build --host 10.0.0.5 --port 2157 --user vlad --name SGCLOUD -o SGCLOUD.exe
