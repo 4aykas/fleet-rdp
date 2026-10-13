@@ -56,7 +56,7 @@ func run(d deps) (string, error) {
 	if err := d.writeCred("TERMSRV/"+launch.BareHost(p.Host), p.User, p.Password); err != nil {
 		return p.Name, fmt.Errorf("could not save the login: %w", err)
 	}
-	multi := launch.ChooseMulti(d.monitorCount(), d.flags)
+	multi := launch.ChooseMulti(d.monitorCount(), p.Monitors, d.flags)
 	if err := d.start(launch.MstscArgs(p.Host, p.Port, multi)); err != nil {
 		return p.Name, err
 	}

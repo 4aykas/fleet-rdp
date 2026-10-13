@@ -87,12 +87,20 @@ func TestRunIPv6UsesTheBareAddressForTheTargetAndBracketsTheArgument(t *testing.
 func TestRunMonitors(t *testing.T) {
 	cases := []struct {
 		monitors int
+		mode     string
 		flags    []string
 		multi    bool
-	}{{2, nil, true}, {1, nil, false}, {2, []string{"--single"}, false}, {1, []string{"--multi"}, true}}
+	}{
+		{2, "", nil, true}, {1, "", nil, false},
+		{2, "", []string{"--single"}, false}, {1, "", []string{"--multi"}, true},
+		{2, payload.MonitorsOne, nil, false}, {1, payload.MonitorsAll, nil, true},
+		{2, payload.MonitorsOne, []string{"--multi"}, true},
+	}
 	for _, c := range cases {
 		r := &rec{}
-		d := newDeps(template(t, sample()), r)
+		p := sample()
+		p.Monitors = c.mode
+		d := newDeps(template(t, p), r)
 		d.monitorCount = func() int { return c.monitors }
 		d.flags = c.flags
 		if _, err := run(d); err != nil {
@@ -100,7 +108,7 @@ func TestRunMonitors(t *testing.T) {
 		}
 		got := r.started[len(r.started)-1] == "/multimon"
 		if got != c.multi {
-			t.Errorf("monitors=%d flags=%v: multimon=%v, want %v", c.monitors, c.flags, got, c.multi)
+			t.Errorf("monitors=%d mode=%q flags=%v: multimon=%v, want %v", c.monitors, c.mode, c.flags, got, c.multi)
 		}
 	}
 }

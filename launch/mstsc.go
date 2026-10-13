@@ -27,11 +27,20 @@ func MstscArgs(host string, port int, multi bool) []string {
 	return args
 }
 
-// ChooseMulti decides /multimon: by monitor count, unless the launcher was
-// started with --single or --multi (the last one wins). A count of 0 means the
+// ChooseMulti decides /multimon. The payload's mode comes first: "one" never,
+// "all" always, anything else by monitor count. --single or --multi on the
+// command line override it (the last one wins). A count of 0 means the
 // detection failed; that is treated as one monitor.
-func ChooseMulti(monitorCount int, flags []string) bool {
-	multi := monitorCount > 1
+func ChooseMulti(monitorCount int, mode string, flags []string) bool {
+	var multi bool
+	switch mode {
+	case "one":
+		multi = false
+	case "all":
+		multi = true
+	default:
+		multi = monitorCount > 1
+	}
 	for _, f := range flags {
 		switch f {
 		case "--single":

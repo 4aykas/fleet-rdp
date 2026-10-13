@@ -36,22 +36,24 @@ func TestBareHost(t *testing.T) {
 
 func TestChooseMulti(t *testing.T) {
 	cases := []struct {
-		name     string
-		monitors int
-		flags    []string
-		want     bool
+		count int
+		mode  string
+		flags []string
+		want  bool
 	}{
-		{"one monitor", 1, nil, false},
-		{"two monitors", 2, nil, true},
-		{"detection failed", 0, nil, false},
-		{"--single wins over two monitors", 2, []string{"--single"}, false},
-		{"--multi wins over one monitor", 1, []string{"--multi"}, true},
-		{"last flag wins", 1, []string{"--multi", "--single"}, false},
-		{"unknown flags are ignored", 2, []string{"--whatever"}, true},
+		{2, "", nil, true},
+		{1, "", nil, false},
+		{0, "", nil, false},
+		{2, "auto", nil, true},
+		{2, "one", nil, false},
+		{1, "all", nil, true},
+		{2, "one", []string{"--multi"}, true},
+		{1, "all", []string{"--single"}, false},
+		{2, "all", []string{"--multi", "--single"}, false},
 	}
 	for _, c := range cases {
-		if got := ChooseMulti(c.monitors, c.flags); got != c.want {
-			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		if got := ChooseMulti(c.count, c.mode, c.flags); got != c.want {
+			t.Errorf("ChooseMulti(%d, %q, %v) = %v, want %v", c.count, c.mode, c.flags, got, c.want)
 		}
 	}
 }
