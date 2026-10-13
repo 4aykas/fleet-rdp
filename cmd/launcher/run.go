@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net"
+	"strconv"
 
 	"github.com/4aykas/fleet-rdp/launch"
 	"github.com/4aykas/fleet-rdp/payload"
@@ -25,8 +27,27 @@ type deps struct {
 	flags        []string
 	ensureCert   func(payload.Payload) error
 	writeCred    func(target, user, password string) error
+	reach        func(host string, port int) error
+	askRetry     func(title, text string) bool
 	monitorCount func() int
 	start        func(args []string) error
+}
+
+// errCancelled means the person pressed Cancel on the unreachable dialog:
+// nothing was written, and there is nothing more to say.
+var errCancelled = errors.New("cancelled")
+
+// dialogTitle names the server in every dialog the launcher shows.
+func dialogTitle(name string) string {
+	if name == "" {
+		return "Fleet RDP"
+	}
+	return name + " - Fleet RDP"
+}
+
+func unreachableMessage(p payload.Payload) string {
+	return fmt.Sprintf("Cannot reach %s (%s).\n\nIf this computer uses Cloudflare WARP, turn it on, then press Retry.",
+		p.Name, net.JoinHostPort(launch.BareHost(p.Host), strconv.Itoa(p.Port)))
 }
 
 // run does the launcher's whole job. It returns the payload's name (empty when
@@ -46,6 +67,14 @@ func run(d deps) (string, error) {
 	}
 	if err != nil {
 		return "", err
+	}
+
+	// mstsc's own error for an unreachable server says nothing useful; the
+	// usual cause behind Zero Trust is WARP being off.
+	for d.reach(p.Host, p.Port) != nil {
+		if !d.askRetry(dialogTitle(p.Name), unreachableMessage(p)) {
+			return p.Name, errCancelled
+		}
 	}
 
 	// Not fatal (spec, step 2): without a CertHash mstsc shows its own

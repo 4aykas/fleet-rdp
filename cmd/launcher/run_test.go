@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -40,6 +41,14 @@ func newDeps(exe []byte, r *rec) deps {
 			r.credArg = [3]string{target, user, password}
 			return nil
 		},
+		reach: func(string, int) error {
+			r.calls = append(r.calls, "reach")
+			return nil
+		},
+		askRetry: func(string, string) bool {
+			r.calls = append(r.calls, "ask")
+			return false
+		},
 		monitorCount: func() int { return 1 },
 		start: func(args []string) error {
 			r.calls = append(r.calls, "start")
@@ -58,7 +67,7 @@ func TestRunHappyPath(t *testing.T) {
 	if name != "SGCLOUD" {
 		t.Errorf("name = %q", name)
 	}
-	if want := []string{"cert", "cred", "start"}; !reflect.DeepEqual(r.calls, want) {
+	if want := []string{"reach", "cert", "cred", "start"}; !reflect.DeepEqual(r.calls, want) {
 		t.Errorf("order = %v, want %v", r.calls, want)
 	}
 	if r.credArg != [3]string{"TERMSRV/10.0.0.5", "vlad", "Dummy-Pass-1!"} {
@@ -144,7 +153,7 @@ func TestRunFailures(t *testing.T) {
 		if _, err := run(d); err != nil {
 			t.Fatalf("got %v, want nil", err)
 		}
-		if want := []string{"cert", "cred", "start"}; !reflect.DeepEqual(r.calls, want) {
+		if want := []string{"reach", "cert", "cred", "start"}; !reflect.DeepEqual(r.calls, want) {
 			t.Errorf("calls = %v, want %v", r.calls, want)
 		}
 	})
@@ -168,6 +177,65 @@ func TestRunFailures(t *testing.T) {
 			t.Fatalf("got %v", err)
 		}
 	})
+}
+
+func TestRunUnreachableCancel(t *testing.T) {
+	r := &rec{}
+	d := newDeps(template(t, sample()), r)
+	d.reach = func(string, int) error { r.calls = append(r.calls, "reach"); return errors.New("timeout") }
+	var shown string
+	d.askRetry = func(title, text string) bool {
+		r.calls = append(r.calls, "ask")
+		shown = title + "|" + text
+		return false
+	}
+	_, err := run(d)
+	if !errors.Is(err, errCancelled) {
+		t.Fatalf("err = %v, want errCancelled", err)
+	}
+	for _, c := range r.calls {
+		if c == "cert" || c == "cred" || c == "start" {
+			t.Fatalf("%s ran after Cancel: %v", c, r.calls)
+		}
+	}
+	if !strings.Contains(shown, "Cannot reach") || !strings.Contains(shown, "Cloudflare WARP") {
+		t.Fatalf("dialog = %q", shown)
+	}
+	if strings.Contains(shown, sample().Password) {
+		t.Fatal("dialog shows the password")
+	}
+}
+
+func TestRunUnreachableRetryThenOK(t *testing.T) {
+	r := &rec{}
+	d := newDeps(template(t, sample()), r)
+	fails := 2
+	d.reach = func(string, int) error {
+		r.calls = append(r.calls, "reach")
+		if fails > 0 {
+			fails--
+			return errors.New("refused")
+		}
+		return nil
+	}
+	d.askRetry = func(string, string) bool { r.calls = append(r.calls, "ask"); return true }
+	if _, err := run(d); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(r.calls[:5], ","); got != "reach,ask,reach,ask,reach" {
+		t.Fatalf("calls start %q", got)
+	}
+}
+
+func TestRunReachBeforeCert(t *testing.T) {
+	r := &rec{}
+	if _, err := run(newDeps(template(t, sample()), r)); err != nil {
+		t.Fatal(err)
+	}
+	ri, ci := slices.Index(r.calls, "reach"), slices.Index(r.calls, "cert")
+	if ri < 0 || ci < 0 || ri > ci {
+		t.Fatalf("reach must come before cert: %v", r.calls)
+	}
 }
 
 func TestRunCannotReadItself(t *testing.T) {

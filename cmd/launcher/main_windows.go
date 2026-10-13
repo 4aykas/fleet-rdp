@@ -6,7 +6,11 @@ package main
 
 import (
 	"context"
+	"errors"
+	"net"
 	"os"
+	"strconv"
+	"time"
 
 	"golang.org/x/sys/windows"
 
@@ -31,19 +35,39 @@ func main() {
 				return cert.Fetch(context.Background(), host, port)
 			})
 		},
+		reach: func(host string, port int) error {
+			c, err := net.DialTimeout("tcp", net.JoinHostPort(launch.BareHost(host), strconv.Itoa(port)), 5*time.Second)
+			if err != nil {
+				return err
+			}
+			return c.Close()
+		},
+		askRetry:     askRetry,
 		writeCred:    credstore.Write,
 		monitorCount: launch.MonitorCount,
 		start:        launch.StartMstsc,
 	}
 	name, err := run(d)
 	if err != nil {
-		title := "Fleet RDP"
-		if name != "" {
-			title = name + " - Fleet RDP"
+		if errors.Is(err, errCancelled) {
+			os.Exit(0)
 		}
-		showError(title, err.Error())
+		showError(dialogTitle(name), err.Error())
 		os.Exit(1)
 	}
+}
+
+// idRetry is the MessageBox result for the Retry button.
+const idRetry = 4
+
+func askRetry(title, text string) bool {
+	t, err1 := windows.UTF16PtrFromString(title)
+	m, err2 := windows.UTF16PtrFromString(text)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	r, _ := windows.MessageBox(0, m, t, windows.MB_RETRYCANCEL|windows.MB_ICONWARNING)
+	return r == idRetry
 }
 
 func showError(title, text string) {
