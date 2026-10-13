@@ -65,7 +65,7 @@ else {
 }
 
 # c. build and hash
-& ./build.ps1 | Out-Host
+& ./build.ps1 -Version $Version | Out-Host
 $launcher = 'dist/fleet-rdp-launcher.exe'
 $cli = 'dist/fleet-rdp.exe'
 $launcherSha = Get-Sha256 $launcher

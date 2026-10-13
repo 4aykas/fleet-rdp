@@ -1,2 +1,4 @@
 *.exe
 dist/
+*.syso
+cmd/launcher/winres/icon.ico

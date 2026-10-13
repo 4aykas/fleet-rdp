@@ -1,0 +1,20 @@
+{
+  "RT_GROUP_ICON": { "APP": { "0000": "icon.ico" } },
+  "RT_VERSION": {
+    "#1": {
+      "0000": {
+        "fixed": { "file_version": "0.0.0.0", "product_version": "0.0.0.0" },
+        "info": {
+          "0409": {
+            "CompanyName": "FleetView",
+            "FileDescription": "FleetView RDP launcher",
+            "FileVersion": "0.0.0",
+            "OriginalFilename": "fleet-rdp-launcher.exe",
+            "ProductName": "FleetView",
+            "ProductVersion": "0.0.0"
+          }
+        }
+      }
+    }
+  }
+}

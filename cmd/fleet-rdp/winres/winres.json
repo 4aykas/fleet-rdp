@@ -1,0 +1,19 @@
+{
+  "RT_VERSION": {
+    "#1": {
+      "0000": {
+        "fixed": { "file_version": "0.0.0.0", "product_version": "0.0.0.0" },
+        "info": {
+          "0409": {
+            "CompanyName": "FleetView",
+            "FileDescription": "FleetView RDP launcher builder",
+            "FileVersion": "0.0.0",
+            "OriginalFilename": "fleet-rdp.exe",
+            "ProductName": "FleetView",
+            "ProductVersion": "0.0.0"
+          }
+        }
+      }
+    }
+  }
+}

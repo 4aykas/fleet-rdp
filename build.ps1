@@ -2,8 +2,24 @@
 # dist/fleet-rdp.exe (the CLI), both windows/amd64, and prints their SHA-256.
 # -trimpath keeps the output independent of the checkout path.
 # GOOS, GOARCH and CGO_ENABLED are set for the build only and restored after.
+#
+# -Version vX.Y.Z goes into the executables' file properties (default v0.0.0).
+# The default icon (tools/mkicon) and the .syso resource files are generated
+# here on every build and are not committed.
+param([string]$Version = 'v0.0.0')
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
+
+if ($Version -notmatch '^v\d+\.\d+\.\d+$') { throw "Version '$Version' is not vX.Y.Z" }
+
+# Runs on the host (GOOS/GOARCH are not set yet), so the tools run here.
+$fv = ($Version.TrimStart('v')) + '.0'
+go run ./tools/mkicon cmd/launcher/winres/icon.ico
+if ($LASTEXITCODE -ne 0) { throw 'drawing the default icon failed' }
+foreach ($cmd in 'launcher', 'fleet-rdp') {
+    go run github.com/tc-hib/go-winres@v0.3.3 make --in "cmd/$cmd/winres/winres.json" --out "cmd/$cmd/rsrc" --arch amd64 --file-version $fv --product-version $fv
+    if ($LASTEXITCODE -ne 0) { throw "making the $cmd resources failed" }
+}
 
 $saved = @{}
 foreach ($n in 'GOOS', 'GOARCH', 'CGO_ENABLED') {
