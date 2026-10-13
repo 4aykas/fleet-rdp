@@ -49,6 +49,7 @@ if ($Version -notmatch '^v\d+\.\d+\.\d+$') { throw "Version '$Version' is not vX
 if (Invoke-Native 'git tag' { git tag --list $Version }) { throw "tag $Version already exists locally" }
 Invoke-Native 'git fetch' { git fetch origin --tags --quiet } | Out-Null
 if (Invoke-Native 'git ls-remote' { git ls-remote --tags origin "refs/tags/$Version" }) { throw "tag $Version already exists on origin" }
+if ($SkipPushCheck -and -not $DryRun) { throw '-SkipPushCheck is for -DryRun only: a release is always built from a pushed commit' }
 if ($ProbeHost -and $ProbePort -lt 1) { throw '-ProbeHost needs -ProbePort' }
 if ($ProbePort -and -not $ProbeHost) { throw '-ProbePort needs -ProbeHost' }
 
