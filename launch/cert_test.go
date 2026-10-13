@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/4aykas/fleet-rdp/payload"
@@ -104,6 +105,31 @@ func TestEnsureCert(t *testing.T) {
 		}
 		if fetched || s.sets != 0 || !bytes.Equal(s.data["10.0.0.5"], existing) {
 			t.Error("an existing CertHash must be left alone")
+		}
+	})
+
+	t.Run("present but not 32 bytes: unusable, refetched and rewritten", func(t *testing.T) {
+		s := newStore()
+		s.data["10.0.0.5"] = []byte{1, 2, 3}
+		p := payload.Payload{Host: "10.0.0.5", Port: 2157}
+		if err := EnsureCert(p, s, func(string, int) ([]byte, error) { return der, nil }); err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(s.data["10.0.0.5"], derSum[:]) {
+			t.Errorf("stored %x, want %x", s.data["10.0.0.5"], derSum)
+		}
+	})
+
+	t.Run("a pinned certSha256 that is not valid hex is refused, nothing stored", func(t *testing.T) {
+		for _, bad := range []string{strings.Repeat("zz", 32), "abcd"} {
+			s := newStore()
+			p := payload.Payload{Host: "10.0.0.5", Port: 2157, CertSha256: bad}
+			if err := EnsureCert(p, s, nil); err == nil {
+				t.Errorf("%q: expected an error", bad)
+			}
+			if s.sets != 0 {
+				t.Errorf("%q: nothing should have been written", bad)
+			}
 		}
 	})
 

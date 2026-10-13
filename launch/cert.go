@@ -20,6 +20,8 @@ type CertStore interface {
 //	pinned certSha256 in the payload -> write it, always
 //	CertHash absent                  -> fetch the certificate, write its SHA-256
 //	CertHash present                 -> leave it alone
+//	CertHash of the wrong type or
+//	length (not 32 bytes)            -> unusable, counts as absent: fetch and rewrite
 //
 // A failed fetch (unreachable, WARP off) is not fatal: mstsc will then fail or
 // show its own dialog, which is the honest fallback.
@@ -32,11 +34,11 @@ func EnsureCert(p payload.Payload, store CertStore, fetch func(host string, port
 		}
 		return store.Set(host, sum)
 	}
-	_, present, err := store.Get(host)
+	cur, present, err := store.Get(host)
 	if err != nil {
 		return err
 	}
-	if present {
+	if present && len(cur) == sha256.Size {
 		return nil
 	}
 	der, err := fetch(host, p.Port)

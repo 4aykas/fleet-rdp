@@ -36,11 +36,16 @@ func (s *RegistryStore) Get(host string) ([]byte, bool, error) {
 	}
 	defer k.Close()
 	v, _, err := k.GetBinaryValue(certHashValue)
-	if errors.Is(err, registry.ErrNotExist) {
+	// A value of another type or length is not a pin mstsc wrote: unusable,
+	// so absent (EnsureCert then fetches and overwrites it).
+	if errors.Is(err, registry.ErrNotExist) || errors.Is(err, registry.ErrUnexpectedType) {
 		return nil, false, nil
 	}
 	if err != nil {
 		return nil, false, err
+	}
+	if len(v) != 32 {
+		return nil, false, nil
 	}
 	return v, true, nil
 }
