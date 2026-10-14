@@ -123,9 +123,22 @@ func Rows(g [8][8]bool) [8]string {
 	return out
 }
 
-func rgb(hex string) [3]byte {
-	n, _ := strconv.ParseUint(hex[1:], 16, 32)
-	return [3]byte{byte(n >> 16), byte(n >> 8), byte(n)}
+// rgb reads exactly '#' and six hex digits (either case).
+func rgb(hex string) ([3]byte, bool) {
+	if len(hex) != 7 || hex[0] != '#' {
+		return [3]byte{}, false
+	}
+	for i := 1; i < 7; i++ {
+		c := hex[i]
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F') {
+			return [3]byte{}, false
+		}
+	}
+	n, err := strconv.ParseUint(hex[1:], 16, 32)
+	if err != nil {
+		return [3]byte{}, false
+	}
+	return [3]byte{byte(n >> 16), byte(n >> 8), byte(n)}, true
 }
 
 // round is JavaScript's Math.round for non-negative values.
@@ -133,7 +146,8 @@ func round(f float64) int { return int(math.Floor(f + 0.5)) }
 
 // Render returns size*size RGBA pixels, top-down: a rounded tile with the
 // grid in whole-pixel cells so the art stays sharp at every size. Pixels
-// outside the rounded tile are transparent.
+// outside the rounded tile are transparent. It returns nil when colour or tile
+// is not '#' plus six hex digits.
 func Render(g [8][8]bool, colour, tile string, size int) []byte {
 	pad := 0
 	rad := 2
@@ -143,7 +157,11 @@ func Render(g [8][8]bool, colour, tile string, size int) []byte {
 	}
 	cell := (size - 2*pad) / 8
 	off := (size - 8*cell) / 2
-	ic, tc := rgb(colour), rgb(tile)
+	ic, ok1 := rgb(colour)
+	tc, ok2 := rgb(tile)
+	if !ok1 || !ok2 {
+		return nil
+	}
 	fr, fs := float64(rad), float64(size)
 	out := make([]byte, size*size*4)
 	for y := 0; y < size; y++ {

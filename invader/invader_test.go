@@ -147,3 +147,18 @@ func TestSharedVector(t *testing.T) {
 		t.Fatal("testdata/invader-v1.json is stale: run go test ./invader -update and copy it to FleetView")
 	}
 }
+
+func TestRenderRejectsBadColours(t *testing.T) {
+	g := Grid("rdp.example.test")
+	for _, bad := range []string{"", "red", "#12", "#gggggg", "#1234567", "123456", " #123456"} {
+		if Render(g, bad, NoOrgTile, 16) != nil {
+			t.Errorf("colour %q: want nil", bad)
+		}
+		if Render(g, "#ff5a5f", bad, 16) != nil {
+			t.Errorf("tile %q: want nil", bad)
+		}
+	}
+	if got := Render(g, "#ABCDEF", "#abcdef", 16); len(got) != 16*16*4 {
+		t.Errorf("valid mixed-case colours: length %d", len(got))
+	}
+}
