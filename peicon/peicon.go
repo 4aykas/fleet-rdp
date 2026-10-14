@@ -135,15 +135,23 @@ func findSlots(exe []byte) []slot {
 	return slots
 }
 
+// safeFindSlots is findSlots with a read past the end that a check missed
+// turned into "not our template". Only parsing is covered: the write loop in
+// SetIcons has no recover, so a panic there is never reported as "no byte
+// changed".
+func safeFindSlots(exe []byte) (slots []slot) {
+	defer func() {
+		if recover() != nil {
+			slots = nil
+		}
+	}()
+	return findSlots(exe)
+}
+
 // SetIcons returns how many icons were written; 0 means none (and no byte
 // changed). render returns size*size RGBA pixels, top-down.
 func SetIcons(exe []byte, render func(size int) []byte) (n int) {
-	defer func() {
-		if recover() != nil {
-			n = 0 // a read past the end that a check missed: not our template
-		}
-	}()
-	slots := findSlots(exe)
+	slots := safeFindSlots(exe)
 	if len(slots) == 0 {
 		return 0
 	}
@@ -154,6 +162,10 @@ func SetIcons(exe []byte, render func(size int) []byte) (n int) {
 			return 0
 		}
 	}
+	// In bounds without a recover: findSlots accepted a slot only when
+	// ok(offset, n) held and n >= 40 + w*w*4 + mask size, so the pixels
+	// (w*w*4 bytes at offset+40) and the mask after them lie inside exe, and
+	// each image was checked above to hold w*w*4 bytes.
 	for k, s := range slots {
 		rgba := images[k]
 		px := s.offset + 40

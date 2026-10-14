@@ -184,3 +184,20 @@ func TestRealTemplate(t *testing.T) {
 		t.Fatalf("SetIcons = %d, want 4", n)
 	}
 }
+
+func TestGarbageInputReturnsZeroUnchanged(t *testing.T) {
+	good := makePE([]int{16, 32}, peOpts{})
+	for _, cut := range []int{0x3c, 0x40, 0x80, 0x100, 0x1f0, 0x210, 0x240} {
+		pe := bytes.Clone(good[:cut])
+		before := bytes.Clone(pe)
+		if n := SetIcons(pe, solid); n != 0 || !bytes.Equal(pe, before) {
+			t.Errorf("cut %#x: SetIcons = %d or bytes changed", cut, n)
+		}
+	}
+	garbage := bytes.Repeat([]byte{0xff}, 0x600)
+	garbage[0], garbage[1] = 'M', 'Z'
+	before := bytes.Clone(garbage)
+	if n := SetIcons(garbage, solid); n != 0 || !bytes.Equal(garbage, before) {
+		t.Errorf("garbage: SetIcons = %d or bytes changed", n)
+	}
+}
