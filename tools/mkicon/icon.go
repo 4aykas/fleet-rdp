@@ -1,12 +1,15 @@
-// Command mkicon draws the template's default icon: the FleetView invader in
-// green on a dark grey tile, as an .ico of uncompressed 32-bit DIBs. The
-// dashboard overwrites these pixels in place for each download, which only
-// works because no entry is PNG and every size is fixed.
+// Command mkicon draws an .ico of uncompressed 32-bit DIBs: by default the
+// template's icon (the FleetView invader in green on a dark grey tile), or
+// with -host the invader of that name in its hash colour (the maker's own
+// icon). The dashboard and the maker overwrite these pixels in place for each
+// launcher, which only works because no entry is PNG and every size is fixed.
 package main
 
 import (
 	"bytes"
 	"encoding/binary"
+
+	"github.com/4aykas/fleet-rdp/invader"
 )
 
 // Sizes are the RT_ICON entries the dashboard expects (16, 32, 48, 256).
@@ -23,56 +26,26 @@ var defaultShape = [8]string{
 	".#....#.",
 }
 
-var (
-	invaderRGB = [3]byte{0x4a, 0xde, 0x80}
-	tileRGB    = [3]byte{0x2a, 0x2a, 0x2a}
-)
+const defaultColour = "#4ade80"
 
-// render returns size*size RGBA pixels, top-down: a rounded tile with the
-// shape drawn in whole-pixel cells. The geometry matches the dashboard's
-// renderIcon (dashboard/src/utils/invader.ts).
-func render(shape [8]string, size int) []byte {
-	pad := 0
-	if size > 16 {
-		pad = (size*125 + 500) / 1000 // round(size * 0.125)
+// renderFor returns the pixels for one size: the default icon for an empty
+// host, else the host's invader in its hash colour.
+func renderFor(host string) func(size int) []byte {
+	if host == "" {
+		g := invader.Parse(defaultShape)
+		return func(size int) []byte { return invader.Render(g, defaultColour, invader.NoOrgTile, size) }
 	}
-	cell := (size - 2*pad) / 8
-	off := (size - 8*cell) / 2
-	r := 2
-	if size > 16 {
-		r = (size*2 + 5) / 10 // round(size * 0.2)
-	}
-	px := make([]byte, size*size*4)
-	for y := 0; y < size; y++ {
-		for x := 0; x < size; x++ {
-			i := (y*size + x) * 4
-			if !insideRounded(x, y, size, r) {
-				continue // transparent
-			}
-			c := tileRGB
-			cx, cy := x-off, y-off
-			if cx >= 0 && cy >= 0 && cx < 8*cell && cy < 8*cell && shape[cy/cell][cx/cell] == '#' {
-				c = invaderRGB
-			}
-			px[i], px[i+1], px[i+2], px[i+3] = c[0], c[1], c[2], 0xff
-		}
-	}
-	return px
-}
-
-func insideRounded(x, y, size, r int) bool {
-	fx, fy, fr := float64(x)+0.5, float64(y)+0.5, float64(r)
-	dx := max(fr-fx, fx-(float64(size)-fr), 0)
-	dy := max(fr-fy, fy-(float64(size)-fr), 0)
-	return dx*dx+dy*dy <= fr*fr
+	g := invader.Grid(host)
+	c := invader.ColourFor(host)
+	return func(size int) []byte { return invader.Render(g, c, invader.NoOrgTile, size) }
 }
 
 // buildICO writes an .ico whose every entry is a 32-bit DIB: header with
 // height 2w, BGRA rows bottom-up, then an all-zero AND mask.
-func buildICO(shape [8]string, sizes []int) []byte {
+func buildICO(render func(size int) []byte, sizes []int) []byte {
 	var images [][]byte
 	for _, w := range sizes {
-		rgba := render(shape, w)
+		rgba := render(w)
 		var b bytes.Buffer
 		hdr := make([]byte, 40)
 		binary.LittleEndian.PutUint32(hdr[0:], 40)
