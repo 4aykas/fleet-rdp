@@ -2,3 +2,4 @@
 dist/
 *.syso
 cmd/launcher/winres/icon.ico
+cmd/maker/winres/icon.ico
