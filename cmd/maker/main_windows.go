@@ -14,6 +14,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"sync"
@@ -507,6 +508,10 @@ func checkDone() {
 	host, port, der, err := ui.check.host, ui.check.port, ui.check.der, ui.check.err
 	ui.check.Unlock()
 	enable(idCheck, true)
+	if curHost, curPort, cerr := checkTarget(getText(ui.ctl[idServer])); cerr != nil || curHost != host || curPort != port {
+		status(checkStale())
+		return
+	}
 	if err != nil {
 		// The fixed sentence is the message; the fetch error is not shown.
 		status(checkFailed(host, port))
@@ -518,6 +523,8 @@ func checkDone() {
 }
 
 func create() {
+	show(idFolder, false)
+	ui.savedPath = ""
 	if ui.template == nil {
 		status(errNoTemplate.Error())
 		return
@@ -600,10 +607,15 @@ func showInFolder() {
 	if ui.savedPath == "" {
 		return
 	}
-	cmd := exec.Command("explorer.exe")
+	// The Windows directory, not PATH, so a planted explorer.exe is not run.
+	explorer := "explorer.exe"
+	if dir, err := windows.GetWindowsDirectory(); err == nil {
+		explorer = filepath.Join(dir, "explorer.exe")
+	}
+	cmd := exec.Command(explorer)
 	// Explorer wants /select,"path" with the quotes around the path only,
 	// which Go's own argument quoting does not produce.
-	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: `explorer.exe /select,"` + ui.savedPath + `"`}
+	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: `"` + explorer + `" /select,"` + ui.savedPath + `"`}
 	if cmd.Start() == nil {
 		cmd.Process.Release()
 	}

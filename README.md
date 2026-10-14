@@ -84,8 +84,10 @@ Server (`host`, `host:port` or `[v6]:port`), Login and Password.
 Create launcher... saves a ZIP (or one `.exe` for one person). Send the ZIP the
 way you would send the password itself: it contains it.
 
-The icon is the same invader the FleetView dashboard draws for the server, in
-its colour for servers outside an organization.
+The icon comes from the same invader generator as the FleetView dashboard. The
+maker keys it on the Host it is given, in the hash colour on the no-organization
+tile, so a Fleet server reached by IP looks different from its dashboard
+download.
 
 ## Payload format
 

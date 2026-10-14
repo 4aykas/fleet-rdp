@@ -141,3 +141,9 @@ func TestEmbeddedTemplateMissingInPlainCheckout(t *testing.T) {
 		t.Fatalf("error %v", err)
 	}
 }
+
+func TestCheckStale(t *testing.T) {
+	if got := checkStale(); got != "Server changed while checking; press Check again." {
+		t.Fatalf("got %q", got)
+	}
+}

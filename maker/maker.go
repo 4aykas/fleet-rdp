@@ -74,7 +74,7 @@ func Build(s Spec, template []byte) (Result, error) {
 		return Result{}, errors.New("Add at least one person.")
 	}
 	for i, p := range s.People {
-		if strings.TrimSpace(p.User) == "" {
+		if strings.TrimSpace(bare(strings.TrimSpace(p.User))) == "" {
 			return Result{}, errors.New("Login is empty.")
 		}
 		if p.Password == "" {
@@ -109,7 +109,13 @@ func Build(s Spec, template []byte) (Result, error) {
 			// payload errors never quote the password.
 			return Result{}, fmt.Errorf("Launcher for %s: %w", user, err)
 		}
-		res.Files = append(res.Files, File{Name: FileBase(user, label) + ".exe", Data: data})
+		name := FileBase(user, label) + ".exe"
+		for _, f := range res.Files {
+			if strings.EqualFold(f.Name, name) {
+				return Result{}, fmt.Errorf("Two people would get the same file name %s.", f.Name)
+			}
+		}
+		res.Files = append(res.Files, File{Name: name, Data: data})
 	}
 	return res, nil
 }

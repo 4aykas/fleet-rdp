@@ -92,6 +92,8 @@ func outputPath(path string, people int) (string, bool, error) {
 
 func checkTarget(server string) (string, int, error) { return maker.ParseServer(server) }
 
+func checkStale() string { return "Server changed while checking; press Check again." }
+
 func checkOK() string { return "Reachable, certificate pinned." }
 
 func checkFailed(host string, port int) string {

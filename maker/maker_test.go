@@ -73,6 +73,8 @@ func TestBuildErrors(t *testing.T) {
 		{"no people", spec(), "Add at least one person."},
 		{"bad host", Spec{Host: "bad host", People: []Person{{"anna", secret}}}, "Server: enter an IP address or a DNS name, optionally with :port."},
 		{"blank login", spec(Person{"  ", secret}), "Login is empty."},
+		{"domain only login", spec(Person{`CORP\`, secret}), "Login is empty."},
+		{"same file name", spec(Person{"a:b", secret}, Person{"a?B", secret}), "Two people would get the same file name a_b_Krasna.exe."},
 		{"empty password", spec(Person{"anna", ""}), "Password for anna is empty."},
 		{"long password", spec(Person{"anna", long}), "Password for anna is longer than 1280 characters."},
 		{"duplicate", spec(Person{`CORP\Anna`, secret}, Person{"anna", secret}), "Two people have the login anna."},
