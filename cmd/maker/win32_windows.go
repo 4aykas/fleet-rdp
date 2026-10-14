@@ -31,6 +31,8 @@ var (
 	pSetWindowPos             = user32.NewProc("SetWindowPos")
 	pMoveWindow               = user32.NewProc("MoveWindow")
 	pEnableWindow             = user32.NewProc("EnableWindow")
+	pIsWindowVisible          = user32.NewProc("IsWindowVisible")
+	pIsWindowEnabled          = user32.NewProc("IsWindowEnabled")
 	pSetFocus                 = user32.NewProc("SetFocus")
 	pGetFocus                 = user32.NewProc("GetFocus")
 	pSetWindowTextW           = user32.NewProc("SetWindowTextW")

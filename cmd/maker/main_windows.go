@@ -343,7 +343,15 @@ func wndProc(hwnd windows.HWND, m uint32, w, l uintptr) uintptr {
 			f, _, _ := pGetFocus.Call()
 			ui.focus = windows.HWND(f)
 		} else if ui.focus != 0 {
-			pSetFocus.Call(uintptr(ui.focus))
+			// The control may have been hidden or disabled meanwhile (More
+			// options collapsed, Show in folder hidden): then the first field.
+			target := ui.focus
+			vis, _, _ := pIsWindowVisible.Call(uintptr(target))
+			en, _, _ := pIsWindowEnabled.Call(uintptr(target))
+			if vis == 0 || en == 0 {
+				target = ui.ctl[idServer]
+			}
+			pSetFocus.Call(uintptr(target))
 			return 0
 		}
 	case wmDpiChanged:
