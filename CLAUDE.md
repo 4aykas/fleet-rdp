@@ -15,3 +15,5 @@ One-click RDP launcher. Spec and plan live in the FleetView repo (`rmdi`):
 ## Checks
 
 `.githooks/pre-commit` runs gofmt, vet, tests and the linux and windows builds. Enable it once per clone: `git config core.hooksPath .githooks`.
+
+The maker window is checked by hand with `tools/uidrive/` (screenshot, set/click/read by control ID, Save As to an absolute path); each script's header shows its call. PowerShell variables ignore case, so a `$t` path clobbers a `$T` alias.
