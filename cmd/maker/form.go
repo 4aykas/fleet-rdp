@@ -81,6 +81,10 @@ func suggestedName(s maker.Spec) string {
 // dialog never asked about; a name with no extension gets ".zip" unless that
 // file already exists.
 func outputPath(path string, people int) (string, bool, error) {
+	refuse := errors.New("Save as .zip or .exe.")
+	if people != 1 {
+		refuse = errors.New("Save as .zip.")
+	}
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".exe":
 		if people != 1 {
@@ -91,11 +95,11 @@ func outputPath(path string, people int) (string, bool, error) {
 		return path, false, nil
 	case "":
 		if _, err := os.Stat(path + ".zip"); err == nil {
-			return "", false, errors.New("Save as .zip or .exe.")
+			return "", false, refuse
 		}
 		return path + ".zip", false, nil
 	default:
-		return "", false, errors.New("Save as .zip or .exe.")
+		return "", false, refuse
 	}
 }
 

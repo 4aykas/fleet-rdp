@@ -89,6 +89,7 @@ func TestOutputPath(t *testing.T) {
 		{`C:\x\anna_K`, 1, `C:\x\anna_K.zip`, false, ""},
 		{`C:\x\all.exe`, 2, "", false, "Several people go into one ZIP: choose .zip."},
 		{`C:\x\notes.txt`, 1, "", false, "Save as .zip or .exe."},
+		{`C:\x\notes.txt`, 2, "", false, "Save as .zip."},
 	}
 	for _, c := range cases {
 		out, exe, err := outputPath(c.in, c.people)
