@@ -12,7 +12,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +19,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/4aykas/fleet-rdp/cert"
+	"github.com/4aykas/fleet-rdp/maker"
 	"github.com/4aykas/fleet-rdp/payload"
 )
 
@@ -143,39 +143,12 @@ func runBuild(args []string, stdin io.Reader, stdout, stderr io.Writer, env func
 		fmt.Fprintln(stderr, "fleet-rdp build:", err)
 		return 1
 	}
-	if err := writeAtomic(*out, built); err != nil {
+	if err := maker.WriteAtomic(*out, built); err != nil {
 		fmt.Fprintln(stderr, "fleet-rdp build: cannot write the output:", err)
 		return 1
 	}
 	fmt.Fprintf(stdout, "wrote %s (%d bytes)\n", *out, len(built))
 	return 0
-}
-
-// writeAtomic writes data to a temp file beside path and renames it over path,
-// so a failure never leaves a half-written exe. The temp file is created 0600
-// (the file is as secret as the password; Windows ignores the bits), and the
-// rename gives that mode to the result even when path already existed.
-func writeAtomic(path string, data []byte) (err error) {
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".fleet-rdp-*.tmp")
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err != nil {
-			tmp.Close()
-			os.Remove(tmp.Name())
-		}
-	}()
-	if err = tmp.Chmod(0o600); err != nil && runtime.GOOS != "windows" {
-		return err
-	}
-	if _, err = tmp.Write(data); err != nil {
-		return err
-	}
-	if err = tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmp.Name(), path)
 }
 
 // runProbe prints the SHA-256 of the certificate a server shows on its RDP
