@@ -1,5 +1,5 @@
 # Cuts a release: checks, builds, tags, publishes to GitHub and verifies the
-# published launcher byte for byte.
+# published launcher and maker byte for byte.
 #
 #   pwsh ./release.ps1 -Version v0.1.2 -Notes 'what changed'
 #   pwsh ./release.ps1 -Version v0.1.2 -Notes 'x' -DryRun -ProbeHost H -ProbePort P
@@ -8,12 +8,12 @@
 #   a. -Version is vX.Y.Z and the tag exists neither locally nor on origin.
 #   b. The working tree is clean (untracked files count) and HEAD equals
 #      origin/main after a fetch, so what is released is what is pushed.
-#   c. ./build.ps1, then SHA-256 of both executables.
+#   c. ./build.ps1, then SHA-256 of the three executables.
 #   d. Optional live smoke test: dist/fleet-rdp.exe probe <ProbeHost> <ProbePort>.
-#   e. Annotated tag, push of the tag, gh release create with both assets. The
-#      notes are -Notes, a blank line and the two "sha256  name" lines.
-#   f. The launcher is downloaded from the release and its SHA-256 compared
-#      with the local one.
+#   e. Annotated tag, push of the tag, gh release create with three assets. The
+#      notes are -Notes, a blank line and the three "sha256  name" lines.
+#   f. The launcher and the maker are downloaded from the release and their
+#      SHA-256 compared with the local ones.
 #   g. Prints the pin command for the FleetView repo and the template hash.
 #
 # -DryRun does a-d and prints what e-g would do.
@@ -70,7 +70,9 @@ $launcher = 'dist/fleet-rdp-launcher.exe'
 $cli = 'dist/fleet-rdp.exe'
 $launcherSha = Get-Sha256 $launcher
 $cliSha = Get-Sha256 $cli
-$hashLines = @("$launcherSha  fleet-rdp-launcher.exe", "$cliSha  fleet-rdp.exe")
+$maker = 'dist/fleet-rdp-maker.exe'
+$makerSha = Get-Sha256 $maker
+$hashLines = @("$launcherSha  fleet-rdp-launcher.exe", "$cliSha  fleet-rdp.exe", "$makerSha  fleet-rdp-maker.exe")
 
 # d. live smoke test
 if ($ProbeHost) {
@@ -82,9 +84,10 @@ $notesText = (@($Notes, '') + $hashLines) -join "`n"
 
 if ($DryRun) {
     "DRY RUN: would tag $Version, push it, and run:"
-    "  gh release create $Version --repo $repo --title $Version --verify-tag $launcher $cli --notes <below>"
+    "  gh release create $Version --repo $repo --title $Version --verify-tag $launcher $cli $maker --notes <below>"
     $notesText -split "`n" | ForEach-Object { "    | $_" }
     "DRY RUN: would download https://github.com/$repo/releases/download/$Version/fleet-rdp-launcher.exe and expect $launcherSha"
+    "DRY RUN: would download https://github.com/$repo/releases/download/$Version/fleet-rdp-maker.exe and expect $makerSha"
     "pin: node scripts/pin-launcher.mjs $Version"
     "template sha256: $launcherSha"
     return
@@ -94,20 +97,22 @@ if ($DryRun) {
 Invoke-Native 'git tag' { git tag -a $Version -m $Version } | Out-Null
 Invoke-Native 'git push tag' { git push origin $Version } | Out-Null
 Invoke-Native 'gh release create' {
-    gh release create $Version --repo $repo --title $Version --verify-tag --notes $notesText $launcher $cli
+    gh release create $Version --repo $repo --title $Version --verify-tag --notes $notesText $launcher $cli $maker
 } | Out-Host
 
-# f. verify the published launcher
-$tmp = Join-Path ([IO.Path]::GetTempPath()) ("fleet-rdp-release-" + [guid]::NewGuid() + '.exe')
-try {
-    Invoke-WebRequest -Uri "https://github.com/$repo/releases/download/$Version/fleet-rdp-launcher.exe" -OutFile $tmp
-    $published = Get-Sha256 $tmp
+# f. verify the published launcher and maker
+foreach ($asset in @(@{ Name = 'fleet-rdp-launcher.exe'; Sha = $launcherSha }, @{ Name = 'fleet-rdp-maker.exe'; Sha = $makerSha })) {
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) ("fleet-rdp-release-" + [guid]::NewGuid() + '.exe')
+    try {
+        Invoke-WebRequest -Uri "https://github.com/$repo/releases/download/$Version/$($asset.Name)" -OutFile $tmp
+        $published = Get-Sha256 $tmp
+    }
+    finally {
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+    }
+    if ($published -ne $asset.Sha) { throw "the published $($asset.Name) ($published) differs from the local one ($($asset.Sha))" }
+    "published $($asset.Name) matches the local build"
 }
-finally {
-    Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
-}
-if ($published -ne $launcherSha) { throw "the published launcher ($published) differs from the local one ($launcherSha)" }
-"published launcher matches the local build"
 
 # g. last: what to do next
 "pin: node scripts/pin-launcher.mjs $Version"
