@@ -66,13 +66,21 @@ else {
 
 # c. build and hash
 & ./build.ps1 -Version $Version | Out-Host
-$launcher = 'dist/fleet-rdp-launcher.exe'
-$cli = 'dist/fleet-rdp.exe'
-$launcherSha = Get-Sha256 $launcher
-$cliSha = Get-Sha256 $cli
-$maker = 'dist/fleet-rdp-maker.exe'
-$makerSha = Get-Sha256 $maker
-$hashLines = @("$launcherSha  fleet-rdp-launcher.exe", "$cliSha  fleet-rdp.exe", "$makerSha  fleet-rdp-maker.exe")
+# The one ordered list of release assets. Verify: download it after publishing
+# and compare the hash (the CLI is not verified).
+$assets = @(
+    @{ Name = 'fleet-rdp-launcher.exe'; Verify = $true },
+    @{ Name = 'fleet-rdp.exe'; Verify = $false },
+    @{ Name = 'fleet-rdp-maker.exe'; Verify = $true }
+)
+foreach ($a in $assets) {
+    $a.Path = "dist/$($a.Name)"
+    $a.Sha = Get-Sha256 $a.Path
+}
+$cli = ($assets | Where-Object Name -eq 'fleet-rdp.exe').Path
+$launcherSha = ($assets | Where-Object Name -eq 'fleet-rdp-launcher.exe').Sha
+$assetPaths = @($assets | ForEach-Object { $_.Path })
+$hashLines = @($assets | ForEach-Object { "$($_.Sha)  $($_.Name)" })
 
 # d. live smoke test
 if ($ProbeHost) {
@@ -84,10 +92,11 @@ $notesText = (@($Notes, '') + $hashLines) -join "`n"
 
 if ($DryRun) {
     "DRY RUN: would tag $Version, push it, and run:"
-    "  gh release create $Version --repo $repo --title $Version --verify-tag $launcher $cli $maker --notes <below>"
+    "  gh release create $Version --repo $repo --title $Version --verify-tag $($assetPaths -join ' ') --notes <below>"
     $notesText -split "`n" | ForEach-Object { "    | $_" }
-    "DRY RUN: would download https://github.com/$repo/releases/download/$Version/fleet-rdp-launcher.exe and expect $launcherSha"
-    "DRY RUN: would download https://github.com/$repo/releases/download/$Version/fleet-rdp-maker.exe and expect $makerSha"
+    foreach ($a in $assets | Where-Object Verify) {
+        "DRY RUN: would download https://github.com/$repo/releases/download/$Version/$($a.Name) and expect $($a.Sha)"
+    }
     "pin: node scripts/pin-launcher.mjs $Version"
     "template sha256: $launcherSha"
     return
@@ -97,11 +106,11 @@ if ($DryRun) {
 Invoke-Native 'git tag' { git tag -a $Version -m $Version } | Out-Null
 Invoke-Native 'git push tag' { git push origin $Version } | Out-Null
 Invoke-Native 'gh release create' {
-    gh release create $Version --repo $repo --title $Version --verify-tag --notes $notesText $launcher $cli $maker
+    gh release create $Version --repo $repo --title $Version --verify-tag --notes $notesText @assetPaths
 } | Out-Host
 
 # f. verify the published launcher and maker
-foreach ($asset in @(@{ Name = 'fleet-rdp-launcher.exe'; Sha = $launcherSha }, @{ Name = 'fleet-rdp-maker.exe'; Sha = $makerSha })) {
+foreach ($asset in $assets | Where-Object Verify) {
     $tmp = Join-Path ([IO.Path]::GetTempPath()) ("fleet-rdp-release-" + [guid]::NewGuid() + '.exe')
     try {
         Invoke-WebRequest -Uri "https://github.com/$repo/releases/download/$Version/$($asset.Name)" -OutFile $tmp
