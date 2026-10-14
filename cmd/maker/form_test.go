@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -86,6 +88,7 @@ func TestOutputPath(t *testing.T) {
 		{`C:\x\anna_K.EXE`, 1, `C:\x\anna_K.EXE`, true, ""},
 		{`C:\x\anna_K`, 1, `C:\x\anna_K.zip`, false, ""},
 		{`C:\x\all.exe`, 2, "", false, "Several people go into one ZIP: choose .zip."},
+		{`C:\x\notes.txt`, 1, "", false, "Save as .zip or .exe."},
 	}
 	for _, c := range cases {
 		out, exe, err := outputPath(c.in, c.people)
@@ -145,5 +148,19 @@ func TestEmbeddedTemplateMissingInPlainCheckout(t *testing.T) {
 func TestCheckStale(t *testing.T) {
 	if got := checkStale(); got != "Server changed while checking; press Check again." {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestOutputPathNoExtensionNeverOverwrites(t *testing.T) {
+	dir := t.TempDir()
+	base := filepath.Join(dir, "anna_K")
+	if out, _, err := outputPath(base, 1); err != nil || out != base+".zip" {
+		t.Fatalf("free name: %q %v", out, err)
+	}
+	if err := os.WriteFile(base+".zip", []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := outputPath(base, 1); err == nil || err.Error() != "Save as .zip or .exe." {
+		t.Fatalf("existing file: %v", err)
 	}
 }

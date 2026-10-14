@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -75,7 +76,10 @@ func suggestedName(s maker.Spec) string {
 }
 
 // outputPath decides the format by the extension the Save As dialog returned:
-// .exe writes one bare launcher (one person only), anything else a ZIP.
+// .exe writes one bare launcher (one person only), .zip a ZIP. Any other
+// extension is refused, as appending ".zip" would overwrite a file the Save As
+// dialog never asked about; a name with no extension gets ".zip" unless that
+// file already exists.
 func outputPath(path string, people int) (string, bool, error) {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".exe":
@@ -85,8 +89,13 @@ func outputPath(path string, people int) (string, bool, error) {
 		return path, true, nil
 	case ".zip":
 		return path, false, nil
-	default:
+	case "":
+		if _, err := os.Stat(path + ".zip"); err == nil {
+			return "", false, errors.New("Save as .zip or .exe.")
+		}
 		return path + ".zip", false, nil
+	default:
+		return "", false, errors.New("Save as .zip or .exe.")
 	}
 }
 
