@@ -12,6 +12,8 @@ One-click RDP launcher. Spec and plan live in the FleetView repo (`rmdi`):
 - invader/ and peicon/ are ports of FleetView's dashboard/src/utils/invader.ts and peIcon.ts; testdata/invader-v1.json is copied into FleetView like the payload vectors.
 - Dependencies: stdlib, `golang.org/x/sys`, `golang.org/x/term`, `github.com/danieljoos/wincred` (inside `credstore` only).
 
+Findings left for later live in `docs/deferred.md`; read it before working in a package it names.
+
 ## Checks
 
 `.githooks/pre-commit` runs gofmt, vet, tests and the linux and windows builds. Enable it once per clone: `git config core.hooksPath .githooks`.
