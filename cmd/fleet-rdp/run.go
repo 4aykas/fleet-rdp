@@ -116,10 +116,14 @@ func runBuild(args []string, stdin io.Reader, stdout, stderr io.Writer, env func
 	if label == "" {
 		label = *host
 	}
+	mon := *monitors
+	if mon == payload.MonitorsAuto {
+		mon = "" // auto is the default; keep it off the wire
+	}
 	p := payload.Payload{
 		V: payload.Version, Name: label, Host: *host, Port: *port,
 		User: *user, Password: "x", CertSha256: strings.ToLower(*pin),
-		Monitors: *monitors,
+		Monitors: mon,
 	}
 	// Everything but the password is checked before the prompt, so a typo in
 	// a flag does not cost a typed password. (A placeholder stands in for it.)

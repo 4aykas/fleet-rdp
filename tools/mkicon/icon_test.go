@@ -21,8 +21,10 @@ func TestICOHoldsFourDIBs(t *testing.T) {
 		if binary.LittleEndian.Uint32(img[0:]) != 40 ||
 			int(int32(binary.LittleEndian.Uint32(img[4:]))) != w ||
 			int(int32(binary.LittleEndian.Uint32(img[8:]))) != 2*w ||
-			binary.LittleEndian.Uint16(img[14:]) != 32 {
-			t.Fatalf("size %d: not a 32-bit DIB with height 2w", w)
+			binary.LittleEndian.Uint16(img[12:]) != 1 ||
+			binary.LittleEndian.Uint16(img[14:]) != 32 ||
+			binary.LittleEndian.Uint32(img[16:]) != 0 {
+			t.Fatalf("size %d: not an uncompressed single-plane 32-bit DIB with height 2w", w)
 		}
 		maskRow := (w + 31) / 32 * 4
 		if size != 40+w*w*4+maskRow*w {

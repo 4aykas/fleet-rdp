@@ -67,7 +67,7 @@ func TestBuildThenInspect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := payload.Payload{V: 1, Name: "SGCLOUD", Host: "10.0.0.5", Port: 2157, User: `CORP\vlad`, Password: secret, Monitors: payload.MonitorsAuto}
+	want := payload.Payload{V: 1, Name: "SGCLOUD", Host: "10.0.0.5", Port: 2157, User: `CORP\vlad`, Password: secret}
 	if p != want {
 		t.Fatalf("payload = %+v, want %+v", p, want)
 	}
@@ -156,6 +156,9 @@ func TestBuildMonitors(t *testing.T) {
 		args := []string{"build", "--host", "h", "--user", "u", "--monitors", "two", "--template", tpl, "-o", out}
 		if code := run(args, failingReader{t}, &o, &e, noEnv); code != 1 {
 			t.Fatalf("exit %d, want 1 (%s)", code, e.String())
+		}
+		if !strings.Contains(e.String(), "monitors") {
+			t.Fatalf("stderr does not mention monitors: %s", e.String())
 		}
 		if _, err := os.Stat(out); err == nil {
 			t.Fatal("an output file was written")

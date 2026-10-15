@@ -13,7 +13,7 @@ param([string]$Version = 'v0.0.0')
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 
-if ($Version -notmatch '^v\d+\.\d+\.\d+$') { throw "Version '$Version' is not vX.Y.Z" }
+if ($Version -cnotmatch '^v\d+\.\d+\.\d+$') { throw "Version '$Version' is not vX.Y.Z" }
 
 # Runs on the host (GOOS/GOARCH are not set yet), so the tools run here.
 $fv = ($Version.TrimStart('v')) + '.0'

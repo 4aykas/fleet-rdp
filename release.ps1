@@ -45,7 +45,7 @@ function Get-Sha256([string]$Path) {
 }
 
 # a. version and tag
-if ($Version -notmatch '^v\d+\.\d+\.\d+$') { throw "Version '$Version' is not vX.Y.Z" }
+if ($Version -cnotmatch '^v\d+\.\d+\.\d+$') { throw "Version '$Version' is not vX.Y.Z" }
 if (Invoke-Native 'git tag' { git tag --list $Version }) { throw "tag $Version already exists locally" }
 Invoke-Native 'git fetch' { git fetch origin --tags --quiet } | Out-Null
 if (Invoke-Native 'git ls-remote' { git ls-remote --tags origin "refs/tags/$Version" }) { throw "tag $Version already exists on origin" }

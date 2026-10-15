@@ -50,6 +50,9 @@ func TestChooseMulti(t *testing.T) {
 		{2, "one", []string{"--multi"}, true},
 		{1, "all", []string{"--single"}, false},
 		{2, "all", []string{"--multi", "--single"}, false},
+		{2, "one", []string{"--bogus"}, false},
+		{2, "", []string{"--bogus"}, true},
+		{1, "all", []string{"--bogus", "--single"}, false},
 	}
 	for _, c := range cases {
 		if got := ChooseMulti(c.count, c.mode, c.flags); got != c.want {

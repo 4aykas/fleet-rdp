@@ -222,6 +222,9 @@ func TestRunUnreachableRetryThenOK(t *testing.T) {
 	if _, err := run(d); err != nil {
 		t.Fatal(err)
 	}
+	if len(r.calls) < 5 {
+		t.Fatalf("calls = %v, want at least 5", r.calls)
+	}
 	if got := strings.Join(r.calls[:5], ","); got != "reach,ask,reach,ask,reach" {
 		t.Fatalf("calls start %q", got)
 	}
