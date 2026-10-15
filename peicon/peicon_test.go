@@ -2,11 +2,16 @@ package peicon
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
+	"flag"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+var update = flag.Bool("update", false, "rewrite testdata/peicon-shortraw-v1.json")
 
 type peOpts struct {
 	bpp uint16
@@ -199,5 +204,70 @@ func TestGarbageInputReturnsZeroUnchanged(t *testing.T) {
 	before := bytes.Clone(garbage)
 	if n := SetIcons(garbage, solid); n != 0 || !bytes.Equal(garbage, before) {
 		t.Errorf("garbage: SetIcons = %d or bytes changed", n)
+	}
+}
+
+// vectorCase is one PE and what SetIcons must do with it. The dashboard reads
+// the same file (dashboard/test/peIcon.vector.test.ts).
+type vectorCase struct {
+	Name      string `json:"name"`
+	PEBase64  string `json:"pe_base64"`
+	Written   int    `json:"written"`
+	Unchanged bool   `json:"unchanged"`
+}
+
+func buildPEVector() []vectorCase {
+	const section = 0x58 + 240 // the one section header
+	le := binary.LittleEndian
+	with := func(virtual, raw uint32) []byte {
+		pe := makePE([]int{16, 32}, peOpts{})
+		le.PutUint32(pe[section+8:], virtual)
+		if raw != 0 {
+			le.PutUint32(pe[section+16:], raw)
+		}
+		return pe
+	}
+	enc := base64.StdEncoding.EncodeToString
+	return []vectorCase{
+		{Name: "virtual size larger than raw data, icons inside the raw data", PEBase64: enc(with(0x10000, 0)), Written: 2},
+		{Name: "icons past SizeOfRawData, though VirtualSize covers them", PEBase64: enc(with(0x10000, 0x80)), Written: 0, Unchanged: true},
+	}
+}
+
+func TestSharedVector(t *testing.T) {
+	path := filepath.Join("..", "testdata", "peicon-shortraw-v1.json")
+	want, err := json.MarshalIndent(buildPEVector(), "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = append(want, '\n')
+	if *update {
+		if err := os.WriteFile(path, want, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("%v (run go test ./peicon -update)", err)
+	}
+	if string(raw) != string(want) {
+		t.Fatal("testdata/peicon-shortraw-v1.json is stale: run go test ./peicon -update and copy it to FleetView")
+	}
+	var cases []vectorCase
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cases {
+		pe, err := base64.StdEncoding.DecodeString(c.PEBase64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		before := bytes.Clone(pe)
+		if n := SetIcons(pe, solid); n != c.Written {
+			t.Errorf("%s: SetIcons = %d, want %d", c.Name, n, c.Written)
+		}
+		if c.Unchanged && !bytes.Equal(pe, before) {
+			t.Errorf("%s: bytes changed", c.Name)
+		}
 	}
 }

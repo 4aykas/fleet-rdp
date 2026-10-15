@@ -18,4 +18,4 @@ Findings left for later live in `docs/deferred.md`; read it before working in a 
 
 `.githooks/pre-commit` runs gofmt, vet, tests and the linux and windows builds. Enable it once per clone: `git config core.hooksPath .githooks`.
 
-The maker window is checked by hand with `tools/uidrive/` (screenshot, set/click/read by control ID, Save As to an absolute path); each script's header shows its call. PowerShell variables ignore case, so a `$t` path clobbers a `$T` alias.
+The maker window is checked by hand with `tools/uidrive/` (screenshot, set/click/read by control ID, Save As to an absolute path); each script's header shows its call. PowerShell variables ignore case, so a `$t` path clobbers a `$T` alias. The maker's WM_ACTIVATE handling (collapse More on deactivate, focus back on the Server field on activate) was checked by script only: synthetic WM_ACTIVATE inactive then active, `GetGUIThreadInfo` showed focus on the Server field; a real Alt-Tab needs an interactive desktop.

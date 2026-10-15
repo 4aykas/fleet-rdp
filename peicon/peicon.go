@@ -63,8 +63,10 @@ func findSlots(exe []byte) []slot {
 		for i := 0; i < sections; i++ {
 			s := secTable + i*40
 			va := u32(s + 12)
-			vsize := max(u32(s+8), u32(s+16))
-			if rva >= va && uint64(rva) < uint64(va)+uint64(vsize) {
+			// Only bytes the file really holds (SizeOfRawData): the loader zero-fills
+			// the rest of a larger VirtualSize, and there is nothing to overwrite there.
+			raw := u32(s + 16)
+			if rva >= va && uint64(rva) < uint64(va)+uint64(raw) {
 				return int(u32(s+20)) + int(rva-va)
 			}
 		}
