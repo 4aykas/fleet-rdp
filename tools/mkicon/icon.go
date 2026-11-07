@@ -15,24 +15,13 @@ import (
 // Sizes are the RT_ICON entries the dashboard expects (16, 32, 48, 256).
 var Sizes = []int{16, 32, 48, 256}
 
-var defaultShape = [8]string{
-	"..#..#..",
-	".######.",
-	"##.##.##",
-	"########",
-	".######.",
-	".#.##.#.",
-	"#......#",
-	".#....#.",
-}
-
 const defaultColour = "#4ade80"
 
 // renderFor returns the pixels for one size: the default icon for an empty
 // host, else the host's invader in its hash colour.
 func renderFor(host string) func(size int) []byte {
 	if host == "" {
-		g := invader.Parse(defaultShape)
+		g := invader.Parse(invader.Fallback)
 		return func(size int) []byte { return invader.Render(g, defaultColour, invader.NoOrgTile, size) }
 	}
 	g := invader.Grid(host)

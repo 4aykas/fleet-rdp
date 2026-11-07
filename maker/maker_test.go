@@ -35,7 +35,7 @@ func TestBuildOnePerson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := payload.Payload{V: 1, Name: "Krasna", Host: "168.119.80.235", Port: 2157, User: `CORP\anna`, Password: secret, Monitors: "auto"}
+	want := payload.Payload{V: 1, Name: "Krasna", Host: "168.119.80.235", Port: 2157, User: `CORP\anna`, Password: secret}
 	if p != want {
 		t.Fatalf("payload %+v", p)
 	}

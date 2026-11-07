@@ -105,9 +105,19 @@ if ($DryRun) {
 # e. tag and release
 Invoke-Native 'git tag' { git tag -a $Version -m $Version } | Out-Null
 Invoke-Native 'git push tag' { git push origin $Version } | Out-Null
-Invoke-Native 'gh release create' {
-    gh release create $Version --repo $repo --title $Version --verify-tag --notes $notesText @assetPaths
-} | Out-Host
+try {
+    Invoke-Native 'gh release create' {
+        gh release create $Version --repo $repo --title $Version --verify-tag --notes $notesText @assetPaths
+    } | Out-Host
+}
+catch {
+    # Without this, the pushed tag blocks a re-run (step a refuses an existing tag).
+    # A release gh did create in part is not removed: delete it by hand first.
+    Write-Warning "gh release create failed; removing tag $Version so the release can be re-run"
+    git push origin ":refs/tags/$Version" | Out-Host
+    git tag -d $Version | Out-Host
+    throw
+}
 
 # f. verify the published launcher and maker
 foreach ($asset in $assets | Where-Object Verify) {

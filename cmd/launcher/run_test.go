@@ -179,6 +179,18 @@ func TestRunFailures(t *testing.T) {
 	})
 }
 
+func TestUnreachableMessage(t *testing.T) {
+	p := sample()
+	p.Name = ""
+	if got := unreachableMessage(p); !strings.HasPrefix(got, "Cannot reach 10.0.0.5:2157.\n") {
+		t.Errorf("no name: %q", got)
+	}
+	p.Name = "SGCLOUD"
+	if got := unreachableMessage(p); !strings.HasPrefix(got, "Cannot reach SGCLOUD (10.0.0.5:2157).\n") {
+		t.Errorf("with name: %q", got)
+	}
+}
+
 func TestRunUnreachableCancel(t *testing.T) {
 	r := &rec{}
 	d := newDeps(template(t, sample()), r)

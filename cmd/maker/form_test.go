@@ -112,24 +112,11 @@ func TestMessages(t *testing.T) {
 	if got := checkFailed("::1", 3389); got != "Cannot reach [::1]:3389. If this computer uses Cloudflare WARP, turn it on." {
 		t.Fatalf("got %q", got)
 	}
-	if got := checkOK(); got != "Reachable, certificate pinned." {
-		t.Fatalf("got %q", got)
-	}
 	if got := savedMessage(`C:\x\a.zip`, false); got != `Saved C:\x\a.zip.` {
 		t.Fatalf("got %q", got)
 	}
 	if got := savedMessage(`C:\x\a.zip`, true); got != `Saved C:\x\a.zip with the default icon.` {
 		t.Fatalf("got %q", got)
-	}
-}
-
-func TestCheckTarget(t *testing.T) {
-	h, p, err := checkTarget("rdp.example:2157")
-	if err != nil || h != "rdp.example" || p != 2157 {
-		t.Fatalf("%q %d %v", h, p, err)
-	}
-	if _, _, err := checkTarget(""); err == nil {
-		t.Fatal("want an error")
 	}
 }
 
@@ -143,12 +130,6 @@ func TestEmbeddedTemplateMissingInPlainCheckout(t *testing.T) {
 	}
 	if err != errNoTemplate {
 		t.Fatalf("error %v", err)
-	}
-}
-
-func TestCheckStale(t *testing.T) {
-	if got := checkStale(); got != "Server changed while checking; press Check again." {
-		t.Fatalf("got %q", got)
 	}
 }
 

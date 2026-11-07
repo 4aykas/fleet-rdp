@@ -18,8 +18,9 @@ var Colours = [10]string{
 // NoOrgTile is the tile of a server with no organization.
 const NoOrgTile = "#2a2a2a"
 
-// fallback is the FleetView invader, used when no generated shape passes.
-var fallback = [8]string{"..#..#..", ".######.", "##.##.##", "########", ".######.", ".#.##.#.", "#......#", ".#....#."}
+// Fallback is the FleetView invader, used when no generated shape passes. It
+// is also the launcher template's default icon (tools/mkicon).
+var Fallback = [8]string{"..#..#..", ".######.", "##.##.##", "########", ".######.", ".#.##.#.", "#......#", ".#....#."}
 
 // profile is the chance of a filled cell per row: antennae, wide body, legs.
 var profile = [8]float64{0.35, 0.5, 0.75, 0.85, 0.85, 0.7, 0.5, 0.45}
@@ -93,7 +94,7 @@ func Grid(host string) [8][8]bool {
 			return g
 		}
 	}
-	return Parse(fallback)
+	return Parse(Fallback)
 }
 
 // Parse reads rows of '#' (filled) and anything else (empty).

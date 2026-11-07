@@ -49,6 +49,9 @@ tagging. `-SkipPushCheck` is for testing the script only.
 
   Do not type the password into an interactive shell line: it goes into the
   history (PSReadLine saves it to `ConsoleHost_history.txt`).
+- Git Bash's default window (mintty) is not a console to Go: there is no hidden
+  prompt and the password shows as it is typed. Use `winpty fleet-rdp build ...`,
+  cmd, PowerShell or Windows Terminal, or set `FLEET_RDP_PASSWORD`.
 - The built `.exe` carries the password. Keep it in a folder only its owner can
   read, and send it only to the person it is for.
 - `--template` defaults to `fleet-rdp-launcher.exe` beside the CLI. A template

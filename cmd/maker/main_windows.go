@@ -494,7 +494,7 @@ func removePerson() {
 // startCheck fetches the server's certificate on a goroutine, which only
 // stores the result and posts wmCheckDone; it never touches a control.
 func startCheck() {
-	host, port, err := checkTarget(getText(ui.ctl[idServer]))
+	host, port, err := maker.ParseServer(getText(ui.ctl[idServer]))
 	if err != nil {
 		status(err.Error())
 		return
@@ -516,8 +516,8 @@ func checkDone() {
 	host, port, der, err := ui.check.host, ui.check.port, ui.check.der, ui.check.err
 	ui.check.Unlock()
 	enable(idCheck, true)
-	if curHost, curPort, cerr := checkTarget(getText(ui.ctl[idServer])); cerr != nil || curHost != host || curPort != port {
-		status(checkStale())
+	if curHost, curPort, cerr := maker.ParseServer(getText(ui.ctl[idServer])); cerr != nil || curHost != host || curPort != port {
+		status(msgCheckStale)
 		return
 	}
 	if err != nil {
@@ -527,7 +527,7 @@ func checkDone() {
 	}
 	sum := cert.Sha256(der)
 	setText(ui.ctl[idCert], hex.EncodeToString(sum[:]))
-	status(checkOK())
+	status(msgCheckOK)
 }
 
 func create() {

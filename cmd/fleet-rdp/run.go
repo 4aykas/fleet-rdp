@@ -116,14 +116,10 @@ func runBuild(args []string, stdin io.Reader, stdout, stderr io.Writer, env func
 	if label == "" {
 		label = *host
 	}
-	mon := *monitors
-	if mon == payload.MonitorsAuto {
-		mon = "" // auto is the default; keep it off the wire
-	}
 	p := payload.Payload{
 		V: payload.Version, Name: label, Host: *host, Port: *port,
 		User: *user, Password: "x", CertSha256: strings.ToLower(*pin),
-		Monitors: mon,
+		Monitors: *monitors,
 	}
 	// Everything but the password is checked before the prompt, so a typo in
 	// a flag does not cost a typed password. (A placeholder stands in for it.)
@@ -223,6 +219,9 @@ func readPassword(stdin io.Reader, stderr io.Writer, env func(string) string) (s
 		}
 		return string(b), nil
 	}
+	// Not a terminal: a pipe from a script, or a console Go cannot see as one
+	// (mintty in Git Bash), where the typing shows. Say so either way.
+	fmt.Fprintln(stderr, "Reading the password from stdin (not a terminal: input is not hidden).")
 	line, err := bufio.NewReader(stdin).ReadString('\n')
 	if err != nil && (err != io.EOF || line == "") {
 		return "", errors.New("no password on stdin and FLEET_RDP_PASSWORD is not set")

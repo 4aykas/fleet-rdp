@@ -46,8 +46,12 @@ func dialogTitle(name string) string {
 }
 
 func unreachableMessage(p payload.Payload) string {
-	return fmt.Sprintf("Cannot reach %s (%s).\n\nIf this computer uses Cloudflare WARP, turn it on, then press Retry.",
-		p.Name, net.JoinHostPort(launch.BareHost(p.Host), strconv.Itoa(p.Port)))
+	addr := net.JoinHostPort(launch.BareHost(p.Host), strconv.Itoa(p.Port))
+	what := addr
+	if p.Name != "" {
+		what = p.Name + " (" + addr + ")"
+	}
+	return "Cannot reach " + what + ".\n\nIf this computer uses Cloudflare WARP, turn it on, then press Retry."
 }
 
 // run does the launcher's whole job. It returns the payload's name (empty when

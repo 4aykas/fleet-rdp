@@ -50,8 +50,6 @@ type Result struct {
 	DefaultIcon bool
 }
 
-const maxPasswordUnits = 1280
-
 // Build returns one launcher per person: the template with this server's
 // invader icon (the dashboard's icon for a server with no organization) and
 // that person's payload appended. The template is not modified.
@@ -80,7 +78,7 @@ func Build(s Spec, template []byte) (Result, error) {
 		if p.Password == "" {
 			return Result{}, fmt.Errorf("Password for %s is empty.", p.User)
 		}
-		if len(utf16.Encode([]rune(p.Password))) > maxPasswordUnits {
+		if len(utf16.Encode([]rune(p.Password))) > payload.MaxPasswordUnits {
 			return Result{}, fmt.Errorf("Password for %s is longer than 1280 characters.", p.User)
 		}
 		for _, q := range s.People[:i] {

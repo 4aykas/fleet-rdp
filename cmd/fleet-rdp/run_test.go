@@ -113,6 +113,9 @@ func TestBuildReadsThePasswordFromStdinWhenThereIsNoEnv(t *testing.T) {
 	if p.Password != secret {
 		t.Fatalf("password = %q", p.Password)
 	}
+	if !strings.Contains(stderr, "not hidden") {
+		t.Fatalf("stderr does not warn that stdin is not hidden: %q", stderr)
+	}
 }
 
 func TestBuildPinsTheCertificate(t *testing.T) {

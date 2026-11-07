@@ -244,6 +244,18 @@ func TestAppendPortZeroWritesDefault(t *testing.T) {
 	}
 }
 
+func TestAppendKeepsAutoOffTheWire(t *testing.T) {
+	p := good()
+	p.Monitors = MonitorsAuto
+	exe, err := Append([]byte("MZ"), p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(exe, []byte(`"monitors"`)) {
+		t.Errorf("auto must not be written: %s", exe[2:len(exe)-trailerLen])
+	}
+}
+
 func TestValidateMonitors(t *testing.T) {
 	base := Payload{V: Version, Name: "n", Host: "10.0.0.5", Port: 3389, User: "u", Password: "p"}
 	for _, m := range []string{"", MonitorsAuto, MonitorsOne, MonitorsAll} {

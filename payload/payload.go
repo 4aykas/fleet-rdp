@@ -19,7 +19,8 @@
 //   - password is not empty and at most 1280 UTF-16 code units (the Credential
 //     Manager limit).
 //   - certSha256 is empty or 64 hex characters.
-//   - monitors is empty, "auto", "one" or "all".
+//   - monitors is empty, "auto", "one" or "all". Append writes "auto" as empty
+//     (the field is left out): auto is the default.
 //   - Fields are written in struct order (v, name, host, port, user, password,
 //     certSha256, monitors), compact, without HTML escaping.
 package payload
@@ -43,10 +44,11 @@ const (
 	MaxJSON     = 64 << 10
 	DefaultPort = 3389
 
-	trailerLen = 4 + len(Magic)
+	// MaxPasswordUnits is the Credential Manager limit, in UTF-16 code units.
+	MaxPasswordUnits = 1280
 
-	maxPasswordUnits = 1280
-	maxHostLen       = 253
+	trailerLen = 4 + len(Magic)
+	maxHostLen = 253
 )
 
 var dnsName = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$`)
@@ -118,7 +120,7 @@ func (p Payload) Validate() error {
 	if p.Password == "" {
 		return fmt.Errorf("%w: password is empty", ErrInvalid)
 	}
-	if len(utf16.Encode([]rune(p.Password))) > maxPasswordUnits {
+	if len(utf16.Encode([]rune(p.Password))) > MaxPasswordUnits {
 		return fmt.Errorf("%w: password is longer than the 1280-character limit of Credential Manager", ErrInvalid)
 	}
 	if p.CertSha256 != "" {
@@ -157,6 +159,9 @@ func Append(template []byte, p Payload) ([]byte, error) {
 	}
 	if p.Port == 0 {
 		p.Port = DefaultPort
+	}
+	if p.Monitors == MonitorsAuto {
+		p.Monitors = "" // auto is the default; keep it off the wire
 	}
 	js, err := marshal(p)
 	if err != nil {
